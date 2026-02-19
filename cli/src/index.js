@@ -3,6 +3,8 @@ import { registerScanCommand } from './commands/scan.js';
 import { registerQueryCommand } from './commands/query.js';
 import { registerUpdateCommand } from './commands/update.js';
 import { registerImpactCommand } from './commands/impact.js';
+import { registerStatusCommand } from './commands/status.js';
+import { registerSliceCommand } from './commands/slice.js';
 
 export function createProgram() {
   const program = new Command();
@@ -15,6 +17,8 @@ export function createProgram() {
   registerQueryCommand(program);
   registerUpdateCommand(program);
   registerImpactCommand(program);
+  registerStatusCommand(program);
+  registerSliceCommand(program);
 
   return program;
 }

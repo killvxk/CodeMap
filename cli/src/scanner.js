@@ -2,15 +2,10 @@ import path from 'path';
 import fs from 'fs/promises';
 import { traverseFiles, detectLanguage } from './traverser.js';
 import { initParser, parseFile } from './parser.js';
-import { createEmptyGraph, computeFileHash } from './graph.js';
+import { createEmptyGraph, computeFileHash, isEntryPoint } from './graph.js';
 
 /** Root-level directories to skip when detecting module names. */
 const COMMON_ROOT_DIRS = new Set(['src', 'lib', 'app', 'source', 'packages']);
-
-/** File basenames (without extension) that mark an entry point. */
-const ENTRY_POINT_PATTERNS = new Set([
-  'main', 'index', 'server', 'app', 'entry', 'bootstrap',
-]);
 
 /**
  * Detect a module name from a file's path relative to the project root.
@@ -58,6 +53,12 @@ export async function scanProject(rootDir, options = {}) {
   // Step 1: Traverse to find all source files
   const files = await traverseFiles(rootDir, { exclude: options.exclude || [] });
 
+  // Detect whether the project contains C++ files, so we can treat .h as C++
+  const hasCppFiles = files.some(f => {
+    const ext = path.extname(f).toLowerCase();
+    return ['.cpp', '.cc', '.cxx', '.hpp', '.hh'].includes(ext);
+  });
+
   // Index: absolute path (normalised with forward slashes) → parsed data + module
   const fileIndex = new Map();
   const languageCounts = {};
@@ -65,16 +66,29 @@ export async function scanProject(rootDir, options = {}) {
   let totalClasses = 0;
   const moduleSet = new Set();
 
-  // Step 2: Parse each file and collect metadata
+  // Step 2: Parse each file and collect metadata (single read per file)
   for (const absPath of files) {
-    const language = detectLanguage(absPath);
+    let language = detectLanguage(absPath);
     if (!language) continue;
+
+    // Reclassify .h files as C++ when the project contains C++ sources
+    if (language === 'c' && hasCppFiles && path.extname(absPath).toLowerCase() === '.h') {
+      language = 'cpp';
+    }
+
+    let content;
+    try {
+      content = await fs.readFile(absPath, 'utf-8');
+    } catch {
+      continue;
+    }
+
+    const hash = computeFileHash(content);
 
     let parsed;
     try {
-      parsed = await parseFile(absPath, language);
+      parsed = await parseFile(absPath, language, content);
     } catch {
-      // Skip files whose language has no adapter (e.g. Python, Go without adapters)
       continue;
     }
 
@@ -87,8 +101,6 @@ export async function scanProject(rootDir, options = {}) {
     totalClasses += parsed.classes.length;
 
     const relPath = path.relative(rootDir, absPath).replace(/\\/g, '/');
-    const content = await fs.readFile(absPath, 'utf-8');
-    const hash = computeFileHash(content);
 
     fileIndex.set(absPath, {
       relPath,
@@ -109,12 +121,20 @@ export async function scanProject(rootDir, options = {}) {
     };
   }
 
+  // Build a normalised path → moduleName lookup for O(1) import resolution
+  const pathLookup = new Map();
+  for (const [absPath, info] of fileIndex) {
+    const norm = absPath.replace(/\\/g, '/');
+    pathLookup.set(norm, info.moduleName);
+    // Also index without extension for extensionless import resolution
+    const withoutExt = norm.replace(/\.[^/.]+$/, '');
+    if (!pathLookup.has(withoutExt)) {
+      pathLookup.set(withoutExt, info.moduleName);
+    }
+  }
+
   for (const [absPath, info] of fileIndex) {
     const { relPath, language, moduleName, parsed, hash } = info;
-
-    // Detect entry points
-    const baseName = path.basename(absPath, path.extname(absPath)).toLowerCase();
-    const isEntryPoint = ENTRY_POINT_PATTERNS.has(baseName);
 
     // Store file data in graph
     graph.files[relPath] = {
@@ -127,7 +147,7 @@ export async function scanProject(rootDir, options = {}) {
       types: parsed.types,
       imports: parsed.imports,
       exports: parsed.exports,
-      isEntryPoint,
+      isEntryPoint: isEntryPoint(absPath),
     };
 
     // Track file in its module
@@ -137,7 +157,7 @@ export async function scanProject(rootDir, options = {}) {
     for (const imp of parsed.imports) {
       if (imp.isExternal) continue;
 
-      const resolvedModule = resolveImportModule(absPath, imp.source, rootDir, fileIndex);
+      const resolvedModule = resolveImportModule(absPath, imp.source, pathLookup, moduleName);
       if (resolvedModule && resolvedModule !== moduleName) {
         modules[moduleName].dependsOn.add(resolvedModule);
         if (modules[resolvedModule]) {
@@ -172,31 +192,32 @@ export async function scanProject(rootDir, options = {}) {
 
 /**
  * Given a file's absolute path and a relative import source string, resolve
- * which module that import targets.
+ * which module that import targets using the pre-built path lookup.
  *
  * @param {string} importerPath  Absolute path of the file containing the import.
  * @param {string} importSource  The raw import source (e.g. '../auth/login').
- * @param {string} rootDir       Project root directory.
- * @param {Map} fileIndex        Map of absPath → { moduleName, ... }.
+ * @param {Map} pathLookup       Map of normalised path → moduleName.
+ * @param {string} fallback      Fallback module name (the importer's own module).
  * @returns {string|null} The target module name, or null if unresolved.
  */
-function resolveImportModule(importerPath, importSource, rootDir, fileIndex) {
+function resolveImportModule(importerPath, importSource, pathLookup, fallback) {
   // Only resolve relative imports
   if (!importSource.startsWith('.')) return null;
 
   const importerDir = path.dirname(importerPath);
-  const resolved = path.resolve(importerDir, importSource);
-  const resolvedNorm = resolved.replace(/\\/g, '/');
+  const resolved = path.resolve(importerDir, importSource).replace(/\\/g, '/');
 
-  // Try to find a matching file in the index.
-  // The import may omit the extension, so check if any indexed file starts
-  // with the resolved path (after normalisation).
-  for (const [absPath, info] of fileIndex) {
-    const absNorm = absPath.replace(/\\/g, '/');
-    // Exact match, or match with extension appended
-    if (absNorm === resolvedNorm || absNorm.startsWith(resolvedNorm + '.') || absNorm.startsWith(resolvedNorm + '/index.')) {
-      return info.moduleName;
-    }
+  // Direct match (with extension already included)
+  if (pathLookup.has(resolved)) {
+    return pathLookup.get(resolved);
+  }
+
+  // Match without extension (e.g. import './utils' → './utils.ts')
+  // The pathLookup already indexes paths without extensions
+  // Try index file resolution: './auth' → './auth/index'
+  const indexPath = resolved + '/index';
+  if (pathLookup.has(indexPath)) {
+    return pathLookup.get(indexPath);
   }
 
   return null;

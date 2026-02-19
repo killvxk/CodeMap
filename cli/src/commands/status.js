@@ -19,8 +19,8 @@ export function registerStatusCommand(program) {
       try {
         await fs.access(outputDir);
       } catch {
-        console.log('No code graph found. Run "codegraph scan" first.');
-        return;
+        console.error('No code graph found. Run "codegraph scan" first.');
+        process.exit(1);
       }
 
       let graph, meta;
@@ -29,7 +29,7 @@ export function registerStatusCommand(program) {
         meta = await loadMeta(outputDir);
       } catch (err) {
         console.error(`Error loading code graph: ${err.message}`);
-        return;
+        process.exit(1);
       }
 
       // Print status

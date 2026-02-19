@@ -25,13 +25,13 @@ export function querySymbol(graph, symbolName, options = {}) {
     if (!typeFilter || typeFilter === 'function') {
       for (const fn of fileData.functions) {
         if (fn.name === symbolName || fn.name.includes(symbolName)) {
-          // Build calls list: other functions called from the same file
-          const calls = fileData.imports
+          // Imported symbols in the same file (not actual call graph)
+          const fileImports = fileData.imports
             .flatMap(imp => imp.symbols || [])
             .filter(s => s !== fn.name);
 
-          // Build calledBy list: find other files that import this symbol
-          const calledBy = findCallers(graph, filePath, fn.name);
+          // Files/modules that import this symbol
+          const importedBy = findCallers(graph, filePath, fn.name);
 
           results.push({
             kind: 'function',
@@ -40,8 +40,8 @@ export function querySymbol(graph, symbolName, options = {}) {
             file: filePath,
             module: moduleName,
             lines: { start: fn.startLine, end: fn.endLine },
-            calls,
-            calledBy,
+            fileImports,
+            importedBy,
           });
         }
       }
@@ -51,15 +51,15 @@ export function querySymbol(graph, symbolName, options = {}) {
     if (!typeFilter || typeFilter === 'class') {
       for (const cls of fileData.classes) {
         if (cls.name === symbolName || cls.name.includes(symbolName)) {
-          const calledBy = findCallers(graph, filePath, cls.name);
+          const importedBy = findCallers(graph, filePath, cls.name);
           results.push({
             kind: 'class',
             name: cls.name,
             file: filePath,
             module: moduleName,
             lines: { start: cls.startLine, end: cls.endLine },
-            calls: [],
-            calledBy,
+            fileImports: [],
+            importedBy,
           });
         }
       }
@@ -69,15 +69,15 @@ export function querySymbol(graph, symbolName, options = {}) {
     if (!typeFilter || typeFilter === 'type') {
       for (const tp of fileData.types) {
         if (tp.name === symbolName || tp.name.includes(symbolName)) {
-          const calledBy = findCallers(graph, filePath, tp.name);
+          const importedBy = findCallers(graph, filePath, tp.name);
           results.push({
             kind: 'type',
             name: tp.name,
             file: filePath,
             module: moduleName,
             lines: { start: tp.startLine, end: tp.endLine },
-            calls: [],
-            calledBy,
+            fileImports: [],
+            importedBy,
           });
         }
       }

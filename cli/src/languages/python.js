@@ -285,22 +285,6 @@ export class PythonAdapter extends LanguageAdapter {
   // ---------------------------------------------------------------------------
 
   /**
-   * Walk all nodes depth-first, calling `visitor(node)` for each.
-   * Uses an explicit stack (not the cursor API) for simplicity and reliability.
-   */
-  _walkNodes(root, visitor) {
-    const stack = [root];
-    while (stack.length > 0) {
-      const node = stack.pop();
-      visitor(node);
-      // Push children in reverse so that leftmost children are visited first
-      for (let i = node.childCount - 1; i >= 0; i--) {
-        stack.push(node.child(i));
-      }
-    }
-  }
-
-  /**
    * If `node` is a `decorated_definition` wrapping the expected inner type,
    * return the inner node.  If `node` itself is the expected type, return it.
    * Otherwise return null.
@@ -314,19 +298,5 @@ export class PythonAdapter extends LanguageAdapter {
       }
     }
     return null;
-  }
-
-  /** Find the first direct child with the given type. */
-  _findChildOfType(node, type) {
-    for (let i = 0; i < node.childCount; i++) {
-      const child = node.child(i);
-      if (child.type === type) return child;
-    }
-    return null;
-  }
-
-  /** Strip surrounding quotes from a string literal. */
-  _stripQuotes(text) {
-    return text.replace(/^['"`]|['"`]$/g, '');
   }
 }

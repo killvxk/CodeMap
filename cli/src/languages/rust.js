@@ -287,31 +287,4 @@ export class RustAdapter extends LanguageAdapter {
     return types;
   }
 
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Walk all nodes depth-first, calling `visitor(node)` for each.
-   * Uses an explicit stack for simplicity and reliability.
-   */
-  _walkNodes(root, visitor) {
-    const stack = [root];
-    while (stack.length > 0) {
-      const node = stack.pop();
-      visitor(node);
-      for (let i = node.childCount - 1; i >= 0; i--) {
-        stack.push(node.child(i));
-      }
-    }
-  }
-
-  /** Find the first direct child with the given type. */
-  _findChildOfType(node, type) {
-    for (let i = 0; i < node.childCount; i++) {
-      const child = node.child(i);
-      if (child.type === type) return child;
-    }
-    return null;
-  }
 }

@@ -62,4 +62,37 @@ export class LanguageAdapter {
   extractTypes(tree, sourceCode) {
     return [];
   }
+
+  // ---------------------------------------------------------------------------
+  // Shared helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Walk all nodes depth-first, calling `visitor(node)` for each.
+   * Uses an explicit stack (not the cursor API) for simplicity and reliability.
+   */
+  _walkNodes(root, visitor) {
+    const stack = [root];
+    while (stack.length > 0) {
+      const node = stack.pop();
+      visitor(node);
+      for (let i = node.childCount - 1; i >= 0; i--) {
+        stack.push(node.child(i));
+      }
+    }
+  }
+
+  /** Find the first direct child with the given type. */
+  _findChildOfType(node, type) {
+    for (let i = 0; i < node.childCount; i++) {
+      const child = node.child(i);
+      if (child.type === type) return child;
+    }
+    return null;
+  }
+
+  /** Strip surrounding quotes from a string literal. */
+  _stripQuotes(text) {
+    return text.replace(/^['"`]|['"`]$/g, '');
+  }
 }

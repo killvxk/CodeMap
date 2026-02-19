@@ -169,20 +169,6 @@ export class JavaAdapter extends LanguageAdapter {
   // ---------------------------------------------------------------------------
 
   /**
-   * Walk all nodes depth-first, calling `visitor(node)` for each.
-   */
-  _walkNodes(root, visitor) {
-    const stack = [root];
-    while (stack.length > 0) {
-      const node = stack.pop();
-      visitor(node);
-      for (let i = node.childCount - 1; i >= 0; i--) {
-        stack.push(node.child(i));
-      }
-    }
-  }
-
-  /**
    * Find the name of the enclosing class/interface/enum declaration.
    */
   _findEnclosingClassName(node) {

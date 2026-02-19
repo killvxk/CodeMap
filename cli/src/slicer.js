@@ -80,7 +80,7 @@ export function generateSlices(graph) {
  * @param {object} modData - Module data from graph.modules[modName].
  * @returns {object} The module slice.
  */
-function buildModuleSlice(graph, modName, modData) {
+export function buildModuleSlice(graph, modName, modData) {
   const files = [];
   const allExports = [];
   let totalFunctions = 0;

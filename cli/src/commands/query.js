@@ -59,8 +59,8 @@ export function registerQueryCommand(program) {
         console.log(`    File: ${result.file}`);
         console.log(`    Module: ${result.module}`);
         console.log(`    Lines: ${result.lines.start}-${result.lines.end}`);
-        if (result.calledBy.length > 0) {
-          console.log(`    Called by: ${result.calledBy.join(', ')}`);
+        if (result.importedBy.length > 0) {
+          console.log(`    Imported by: ${result.importedBy.join(', ')}`);
         }
       }
     });

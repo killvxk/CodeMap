@@ -1,31 +1,11 @@
 import path from 'path';
 import fs from 'fs/promises';
-import { loadGraph, loadMeta, saveGraph, computeFileHash } from '../graph.js';
+import { loadGraph, loadMeta, saveGraph, computeFileHash, getGitCommitHash, isEntryPoint } from '../graph.js';
 import { traverseFiles, detectLanguage } from '../traverser.js';
 import { initParser, parseFile } from '../parser.js';
 import { detectModuleName } from '../scanner.js';
 import { detectChangedFiles, mergeGraphUpdate } from '../differ.js';
 import { saveSlices } from '../slicer.js';
-
-/**
- * Try to get the current git commit hash from the given directory.
- * Returns null if the directory is not a git repo or simple-git is unavailable.
- *
- * @param {string} dir - Directory to check for git.
- * @returns {Promise<string|null>} The current commit hash or null.
- */
-async function getGitCommitHash(dir) {
-  try {
-    const { simpleGit } = await import('simple-git');
-    const git = simpleGit(dir);
-    const isRepo = await git.checkIsRepo();
-    if (!isRepo) return null;
-    const log = await git.log({ maxCount: 1 });
-    return log.latest ? log.latest.hash : null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Register the `update` command on the given Commander program.
@@ -68,7 +48,6 @@ export function registerUpdateCommand(program) {
           const content = await fs.readFile(absPath, 'utf-8');
           currentHashes[relPath] = computeFileHash(content);
         } catch {
-          // Skip files that can't be read
           continue;
         }
       }
@@ -81,7 +60,7 @@ export function registerUpdateCommand(program) {
         return;
       }
 
-      // Step 5: Re-parse only changed/added files
+      // Step 5: Re-parse only changed/added files (single read per file)
       const updatedFiles = {};
       const changedPaths = [...changes.added, ...changes.modified];
 
@@ -90,18 +69,23 @@ export function registerUpdateCommand(program) {
         const language = detectLanguage(absPath);
         if (!language) continue;
 
+        let content;
+        try {
+          content = await fs.readFile(absPath, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        const hash = computeFileHash(content);
+
         let parsed;
         try {
-          parsed = await parseFile(absPath, language);
+          parsed = await parseFile(absPath, language, content);
         } catch {
           continue;
         }
 
         const moduleName = detectModuleName(absPath, rootDir);
-        const content = await fs.readFile(absPath, 'utf-8');
-        const hash = computeFileHash(content);
-        const baseName = path.basename(absPath, path.extname(absPath)).toLowerCase();
-        const isEntryPoint = ['main', 'index', 'server', 'app', 'entry', 'bootstrap'].includes(baseName);
 
         updatedFiles[relPath] = {
           language,
@@ -113,7 +97,7 @@ export function registerUpdateCommand(program) {
           types: parsed.types,
           imports: parsed.imports,
           exports: parsed.exports,
-          isEntryPoint,
+          isEntryPoint: isEntryPoint(absPath),
         };
       }
 

@@ -249,27 +249,10 @@ export class GoAdapter extends LanguageAdapter {
   // Helpers
   // ---------------------------------------------------------------------------
 
-  /** Walk all nodes depth-first, calling visitor(node) for each. */
-  _walkNodes(root, visitor) {
-    const stack = [root];
-    while (stack.length > 0) {
-      const node = stack.pop();
-      visitor(node);
-      for (let i = node.childCount - 1; i >= 0; i--) {
-        stack.push(node.child(i));
-      }
-    }
-  }
-
   /** Check whether a Go identifier is exported (starts with uppercase). */
   _isExported(name) {
     if (!name || name.length === 0) return false;
     const first = name.charCodeAt(0);
     return first >= 65 && first <= 90; // A-Z
-  }
-
-  /** Strip surrounding quotes from a string literal. */
-  _stripQuotes(text) {
-    return text.replace(/^['"`]|['"`]$/g, '');
   }
 }

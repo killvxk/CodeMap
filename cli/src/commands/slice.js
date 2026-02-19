@@ -1,6 +1,6 @@
 import path from 'path';
 import { loadGraph } from '../graph.js';
-import { generateOverview, generateSlices, getModuleSliceWithDeps } from '../slicer.js';
+import { generateOverview, buildModuleSlice, getModuleSliceWithDeps } from '../slicer.js';
 
 /**
  * Register the `slice` command on the given Commander program.
@@ -40,13 +40,11 @@ export function registerSliceCommand(program) {
       }
 
       if (options.withDeps) {
-        // Include dependency info
         const sliceWithDeps = getModuleSliceWithDeps(graph, moduleName);
         console.log(JSON.stringify(sliceWithDeps, null, 2));
       } else {
-        // Simple module slice
-        const slices = generateSlices(graph);
-        const slice = slices[moduleName];
+        // Build only the target module's slice instead of all modules
+        const slice = buildModuleSlice(graph, moduleName, graph.modules[moduleName]);
         console.log(JSON.stringify(slice, null, 2));
       }
     });

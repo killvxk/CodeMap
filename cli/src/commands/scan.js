@@ -1,27 +1,7 @@
 import path from 'path';
 import { scanProject } from '../scanner.js';
-import { saveGraph, computeFileHash } from '../graph.js';
+import { saveGraph, computeFileHash, getGitCommitHash } from '../graph.js';
 import { saveSlices } from '../slicer.js';
-
-/**
- * Try to get the current git commit hash from the given directory.
- * Returns null if the directory is not a git repo or simple-git is unavailable.
- *
- * @param {string} dir - Directory to check for git.
- * @returns {Promise<string|null>} The current commit hash or null.
- */
-async function getGitCommitHash(dir) {
-  try {
-    const { simpleGit } = await import('simple-git');
-    const git = simpleGit(dir);
-    const isRepo = await git.checkIsRepo();
-    if (!isRepo) return null;
-    const log = await git.log({ maxCount: 1 });
-    return log.latest ? log.latest.hash : null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Register the `scan` command on the given Commander program.

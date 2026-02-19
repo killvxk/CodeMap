@@ -128,7 +128,7 @@ async function loadLanguage(language) {
  *   lines: number,
  * }>}
  */
-export async function parseFile(filePath, language) {
+export async function parseFile(filePath, language, sourceCode) {
   if (!initialised) {
     throw new Error('Parser not initialised. Call initParser() first.');
   }
@@ -142,21 +142,22 @@ export async function parseFile(filePath, language) {
   const parser = new Parser();
   parser.setLanguage(lang);
 
-  const sourceCode = await fs.readFile(filePath, 'utf-8');
+  if (!sourceCode) {
+    sourceCode = await fs.readFile(filePath, 'utf-8');
+  }
   const tree = parser.parse(sourceCode);
 
-  const result = {
-    functions: adapter.extractFunctions(tree, sourceCode),
-    imports: adapter.extractImports(tree, sourceCode),
-    exports: adapter.extractExports(tree, sourceCode),
-    classes: adapter.extractClasses(tree, sourceCode),
-    types: adapter.extractTypes(tree, sourceCode),
-    lines: sourceCode.split('\n').length,
-  };
-
-  // Clean up WASM resources.
-  tree.delete();
-  parser.delete();
-
-  return result;
+  try {
+    return {
+      functions: adapter.extractFunctions(tree, sourceCode),
+      imports: adapter.extractImports(tree, sourceCode),
+      exports: adapter.extractExports(tree, sourceCode),
+      classes: adapter.extractClasses(tree, sourceCode),
+      types: adapter.extractTypes(tree, sourceCode),
+      lines: sourceCode.split('\n').length,
+    };
+  } finally {
+    tree.delete();
+    parser.delete();
+  }
 }

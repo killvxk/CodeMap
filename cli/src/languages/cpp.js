@@ -261,27 +261,6 @@ export class CppAdapter extends LanguageAdapter {
   // Helpers
   // ---------------------------------------------------------------------------
 
-  /** Walk all nodes depth-first, calling visitor(node) for each. */
-  _walkNodes(root, visitor) {
-    const stack = [root];
-    while (stack.length > 0) {
-      const node = stack.pop();
-      visitor(node);
-      for (let i = node.childCount - 1; i >= 0; i--) {
-        stack.push(node.child(i));
-      }
-    }
-  }
-
-  /** Find the first direct child with the given type. */
-  _findChildOfType(node, type) {
-    for (let i = 0; i < node.childCount; i++) {
-      const child = node.child(i);
-      if (child.type === type) return child;
-    }
-    return null;
-  }
-
   /** Find the first descendant (BFS) with the given type. */
   _findDescendantOfType(node, type) {
     const queue = [];

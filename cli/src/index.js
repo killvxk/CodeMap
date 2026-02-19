@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { registerScanCommand } from './commands/scan.js';
 import { registerQueryCommand } from './commands/query.js';
+import { registerUpdateCommand } from './commands/update.js';
 
 export function createProgram() {
   const program = new Command();
@@ -11,6 +12,7 @@ export function createProgram() {
 
   registerScanCommand(program);
   registerQueryCommand(program);
+  registerUpdateCommand(program);
 
   return program;
 }

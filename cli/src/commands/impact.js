@@ -25,7 +25,8 @@ export function registerImpactCommand(program) {
         process.exit(1);
       }
 
-      const depth = parseInt(options.depth, 10) || 3;
+      const parsed = parseInt(options.depth, 10);
+      const depth = Number.isNaN(parsed) ? 3 : parsed;
       const result = analyzeImpact(graph, target, { depth });
 
       console.log(`Impact analysis for: ${target}`);

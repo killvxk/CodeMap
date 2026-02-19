@@ -5,6 +5,8 @@
  * and provides a function to merge partial updates into the full graph.
  */
 
+import path from 'path';
+
 /**
  * Compare two file hash maps to detect changes.
  *
@@ -111,8 +113,9 @@ export function mergeGraphUpdate(graph, updatedFiles, removedFiles) {
     }
   }
 
-  // Step 4: Recalculate summary
+  // Step 4: Recalculate summary and rebuild module dependencies
   recalculateSummary(graph);
+  rebuildDependencies(graph);
 }
 
 /**
@@ -140,4 +143,70 @@ function recalculateSummary(graph) {
   graph.summary.totalClasses = totalClasses;
   graph.summary.languages = languages;
   graph.summary.modules = Object.keys(graph.modules).sort();
+  graph.summary.entryPoints = Object.entries(graph.files)
+    .filter(([, f]) => f.isEntryPoint)
+    .map(([relPath]) => relPath)
+    .sort();
+  if (graph.config) {
+    graph.config.languages = Object.keys(languages);
+  }
+}
+
+/**
+ * Rebuild module-level dependsOn / dependedBy from file-level import data.
+ *
+ * Iterates every file in the graph, resolves each relative import to a target
+ * module via a normalised-path lookup (mirroring scanner.js logic), and
+ * overwrites the dependency arrays on every module.
+ *
+ * @param {object} graph - The full code graph (mutated in place).
+ */
+function rebuildDependencies(graph) {
+  // Build normalised relative-path → moduleName lookup (O(1) resolution)
+  const pathLookup = new Map();
+  for (const [relPath, fileData] of Object.entries(graph.files)) {
+    const norm = relPath.replace(/\\/g, '/');
+    pathLookup.set(norm, fileData.module);
+    const withoutExt = norm.replace(/\.[^/.]+$/, '');
+    if (!pathLookup.has(withoutExt)) {
+      pathLookup.set(withoutExt, fileData.module);
+    }
+  }
+
+  // Collect dependencies using Sets
+  const depSets = {};
+  for (const modName of Object.keys(graph.modules)) {
+    depSets[modName] = { dependsOn: new Set(), dependedBy: new Set() };
+  }
+
+  for (const [relPath, fileData] of Object.entries(graph.files)) {
+    const moduleName = fileData.module;
+    if (!depSets[moduleName]) continue;
+
+    for (const imp of fileData.imports) {
+      if (imp.isExternal) continue;
+      if (!imp.source.startsWith('.')) continue;
+
+      const importerDir = path.posix.dirname(relPath.replace(/\\/g, '/'));
+      const resolved = path.posix.normalize(importerDir + '/' + imp.source);
+
+      let targetModule = pathLookup.get(resolved);
+      if (!targetModule) {
+        targetModule = pathLookup.get(resolved + '/index');
+      }
+
+      if (targetModule && targetModule !== moduleName && depSets[targetModule]) {
+        depSets[moduleName].dependsOn.add(targetModule);
+        depSets[targetModule].dependedBy.add(moduleName);
+      }
+    }
+  }
+
+  // Apply rebuilt dependencies to graph
+  for (const [modName, deps] of Object.entries(depSets)) {
+    if (graph.modules[modName]) {
+      graph.modules[modName].dependsOn = [...deps.dependsOn].sort();
+      graph.modules[modName].dependedBy = [...deps.dependedBy].sort();
+    }
+  }
 }

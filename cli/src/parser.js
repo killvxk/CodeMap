@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { TypeScriptAdapter } from './languages/typescript.js';
+import { GoAdapter } from './languages/go.js';
 
 // web-tree-sitter uses CommonJS; import via createRequire for ESM compat.
 const require = createRequire(import.meta.url);
@@ -19,6 +20,10 @@ const loadedLanguages = new Map();
 const adapters = new Map([
   ['typescript', new TypeScriptAdapter()],
   ['javascript', new TypeScriptAdapter()], // TS grammar is a JS superset
+  ['go', new GoAdapter()],
+  ['python', new PythonAdapter()],
+  ['rust', new RustAdapter()],
+  ['java', new JavaAdapter()],
 ]);
 
 // ── WASM resolution ──────────────────────────────────────────────────────────

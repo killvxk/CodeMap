@@ -3,4 +3,5 @@ dist/
 .codemap/
 docs/
 *.log
+*.tgz
 .DS_Store

@@ -13,53 +13,216 @@ AST-based code graph mapping plugin for [Claude Code](https://docs.anthropic.com
 - **影响分析 / Impact Analysis** — 重构前查看哪些模块会受影响 / See what's affected before you refactor
 - **自动触发 / Auto-Triggering** — Skill 根据对话上下文自动激活 / Skills activate automatically based on your conversation context
 
+---
+
 ## 安装 / Installation
 
+### 前置条件 / Prerequisites
+
+- **Node.js** >= 18
+- **npm** >= 9
+- **Claude Code** CLI ([安装指南 / Install Guide](https://docs.anthropic.com/en/docs/claude-code))
+
+### 方式一：作为 Claude Code 插件安装（推荐）/ Install as Claude Code Plugin (Recommended)
+
+#### 1. 克隆仓库 / Clone the repository
+
 ```bash
-cd cli
-npm install
+git clone https://github.com/killvxk/CodeMap.git
+cd CodeMap
 ```
 
-然后在 Claude Code 中注册插件，指向 `.claude-plugin/` 目录。
+#### 2. 安装 CLI 依赖 / Install CLI dependencies
 
-Then register the plugin in Claude Code by pointing to the `.claude-plugin/` directory.
+```bash
+cd ccplugin/cli
+npm install
+cd ../..
+```
+
+#### 3. 验证 CLI 可用 / Verify CLI works
+
+```bash
+node ccplugin/cli/bin/codegraph.js --version
+# 输出 / Output: 0.1.0
+```
+
+#### 4. 安装为 Claude Code 插件 / Install as Claude Code plugin
+
+```bash
+# 方式 A：直接安装本地目录（开发/个人使用推荐）
+# Option A: Install from local directory (recommended for dev/personal use)
+claude plugin add /absolute/path/to/CodeMap
+
+# 方式 B：从 GitHub 安装
+# Option B: Install from GitHub
+claude plugin add https://github.com/killvxk/CodeMap.git
+```
+
+> **注意 / Note:** 路径必须是绝对路径，指向项目根目录（包含 `.claude-plugin/marketplace.json`）。Claude Code 会通过 `marketplace.json` 中的 `"source": "./ccplugin"` 自动定位插件目录，发现 skills 和 CLI 路径。
+>
+> The path must be absolute, pointing to the project root (containing `.claude-plugin/marketplace.json`). Claude Code uses `"source": "./ccplugin"` in `marketplace.json` to locate the plugin directory and auto-discover skills and CLI paths.
+
+#### 5. 验证插件已安装 / Verify plugin installed
+
+在 Claude Code 中输入 / Type in Claude Code:
+
+```
+/scan
+```
+
+如果插件正确安装，该 skill 会被识别并触发代码扫描流程。
+
+If the plugin is installed correctly, this skill will be recognized and trigger the code scan workflow.
+
+### 方式二：全局安装 CLI / Global CLI Installation
+
+如果你只需要 CLI 工具（不需要 Claude Code 插件集成）：
+
+If you only need the CLI tool (without Claude Code plugin integration):
+
+```bash
+git clone https://github.com/killvxk/CodeMap.git
+cd CodeMap/ccplugin/cli
+npm install
+npm link
+```
+
+安装后可以直接使用 `codegraph` 命令：
+
+After installation, use the `codegraph` command directly:
+
+```bash
+codegraph scan /path/to/project
+codegraph status /path/to/project
+codegraph query handleLogin --dir /path/to/project
+```
+
+### 方式三：构建发布包 / Build Release Distribution
+
+用于将 CLI 打包分发给他人或部署到 CI。
+
+For packaging the CLI to distribute or deploy in CI.
+
+#### 生成 npm tarball / Generate npm tarball
+
+```bash
+cd ccplugin/cli
+npm pack
+# 生成 / Produces: codegraph-0.1.0.tgz
+```
+
+#### 从 tarball 安装 / Install from tarball
+
+```bash
+npm install -g codegraph-0.1.0.tgz
+codegraph --version
+```
+
+#### GitHub Release 发布流程 / GitHub Release Workflow
+
+```bash
+# 1. 确保测试通过 / Ensure tests pass
+cd ccplugin/cli && npm test
+
+# 2. 更新版本号 / Bump version
+npm version patch  # 或 minor / major
+
+# 3. 生成发布包 / Generate release package
+npm pack
+
+# 4. 提交并打 tag / Commit and tag
+cd ../..
+git add .
+git commit -m "release: v$(node -p "require('./ccplugin/cli/package.json').version")"
+git tag "v$(node -p "require('./ccplugin/cli/package.json').version")"
+git push origin main --tags
+
+# 5. 在 GitHub 创建 Release，上传 .tgz 文件
+# Create a GitHub Release and upload the .tgz file
+gh release create "v$(node -p "require('./ccplugin/cli/package.json').version")" \
+  ccplugin/cli/codegraph-*.tgz \
+  --title "CodeMap v$(node -p "require('./ccplugin/cli/package.json').version")" \
+  --generate-notes
+```
+
+---
+
+## 项目结构 / Project Structure
+
+```
+CodeMap/
+├── .claude-plugin/
+│   └── marketplace.json        # 插件市场清单 / Marketplace manifest
+├── ccplugin/                   # 插件根目录 (CLAUDE_PLUGIN_ROOT)
+│   ├── .claude-plugin/
+│   │   └── plugin.json         #   插件清单 / Plugin manifest
+│   ├── skills/                 #   Claude Code Skills (自动触发)
+│   │   ├── scan/SKILL.md       #     /scan - 全量扫描
+│   │   ├── load/SKILL.md       #     /load - 智能加载
+│   │   ├── update/SKILL.md     #     /update - 增量更新
+│   │   ├── query/SKILL.md      #     /query - 符号查询
+│   │   └── impact/SKILL.md     #     /impact - 影响分析
+│   └── cli/                    #   CLI 工具
+│       ├── bin/codegraph.js    #     入口 / Entry point
+│       ├── src/                #     源码 / Source
+│       │   ├── index.js        #       Commander 注册
+│       │   ├── scanner.js      #       全量扫描引擎
+│       │   ├── parser.js       #       tree-sitter WASM 解析
+│       │   ├── graph.js        #       图谱数据结构
+│       │   ├── differ.js       #       增量更新引擎
+│       │   ├── query.js        #       查询引擎
+│       │   ├── slicer.js       #       切片生成
+│       │   ├── impact.js       #       影响分析
+│       │   ├── traverser.js    #       文件遍历与语言检测
+│       │   ├── commands/       #       CLI 命令实现
+│       │   └── languages/      #       语言适配器 (8 种)
+│       ├── test/               #     测试 (84 tests)
+│       └── package.json
+├── README.md
+└── LICENSE                     # MIT
+```
+
+---
 
 ## CLI 命令 / CLI Commands
 
-所有命令通过 `node cli/bin/codegraph.js <command>` 运行。
+所有命令通过 `codegraph <command>` 或 `node ccplugin/cli/bin/codegraph.js <command>` 运行。
 
-All commands are run via `node cli/bin/codegraph.js <command>`.
+All commands run via `codegraph <command>` or `node ccplugin/cli/bin/codegraph.js <command>`.
 
 | 命令 / Command | 描述 / Description |
 |---------|-------------|
 | `scan <dir>` | 全量 AST 扫描，生成 `.codemap/` 图谱和切片 / Full AST scan, generates `.codemap/` with graph + slices |
-| `status` | 显示图谱元信息（文件数、模块、上次扫描时间）/ Show graph metadata (files, modules, last scan time) |
+| `status [dir]` | 显示图谱元信息（文件数、模块、上次扫描时间）/ Show graph metadata (files, modules, last scan time) |
 | `query <symbol>` | 按名称搜索函数、类、类型 / Search for functions, classes, types by name |
 | `slice [module]` | 输出项目概览或指定模块切片（JSON）/ Output project overview or a specific module slice as JSON |
-| `update` | 增量更新——仅重新解析变更的文件 / Incremental update — re-parse only changed files |
+| `update [dir]` | 增量更新——仅重新解析变更的文件 / Incremental update — re-parse only changed files |
 | `impact <target>` | 分析修改目标会影响哪些模块 / Analyze which modules are affected by changing a target |
 
 ### 示例 / Examples
 
 ```bash
 # 扫描项目 / Scan a project
-node cli/bin/codegraph.js scan /path/to/project
+codegraph scan /path/to/project
 
 # 检查图谱状态 / Check graph status
-node cli/bin/codegraph.js status
+codegraph status /path/to/project
 
 # 查询符号 / Query a symbol
-node cli/bin/codegraph.js query "handleLogin"
+codegraph query "handleLogin" --dir /path/to/project
 
 # 获取模块切片（含依赖）/ Get module slice with dependencies
-node cli/bin/codegraph.js slice auth --with-deps
+codegraph slice auth --with-deps --dir /path/to/project
 
 # 增量更新 / Incremental update after code changes
-node cli/bin/codegraph.js update
+codegraph update /path/to/project
 
 # 影响分析 / Impact analysis before refactoring
-node cli/bin/codegraph.js impact auth --depth 3
+codegraph impact auth --depth 3 --dir /path/to/project
 ```
+
+---
 
 ## Skills
 
@@ -75,6 +238,18 @@ When installed as a Claude Code plugin, these skills auto-trigger based on conve
 | `/query` | "查找", "谁调用了", "where is", "find function" |
 | `/impact` | "影响范围", "refactor impact", "change impact" |
 
+### 典型工作流 / Typical Workflow
+
+```
+1. 首次使用 / First time:     /scan           → 生成 .codemap/ 图谱
+2. 新会话开始 / New session:   /load           → 加载概览 (~500 tokens)
+3. 深入模块 / Dive into module: /load auth     → 加载 auth 模块 (~2-5k tokens)
+4. 代码修改后 / After changes: /update         → 增量更新图谱
+5. 重构前 / Before refactor:   /impact auth    → 查看影响范围
+```
+
+---
+
 ## 支持的语言 / Supported Languages
 
 | 语言 / Language | 扩展名 / Extensions | 提取结构 / Extracted Structures |
@@ -88,11 +263,13 @@ When installed as a Claude Code plugin, these skills auto-trigger based on conve
 | C | `.c`, `.h` | 函数、`#include`、非 static 导出、结构体、枚举、typedef / Functions, `#include`, non-static exports, structs, enums, typedefs |
 | C++ | `.cpp`, `.cc`, `.cxx`, `.hpp`, `.hh` | 限定函数名（`Class::method`）、include、类、结构体、命名空间 / Qualified functions (`Class::method`), includes, classes, structs, namespaces |
 
+---
+
 ## 图谱结构 / Graph Structure
 
-扫描后生成 `.codemap/` 目录：
+扫描后在目标项目内生成 `.codemap/` 目录：
 
-Scanning produces a `.codemap/` directory:
+Scanning produces a `.codemap/` directory inside the target project:
 
 ```
 .codemap/
@@ -105,11 +282,14 @@ Scanning produces a `.codemap/` directory:
     └── ...
 ```
 
+---
+
 ## 测试 / Tests
 
 ```bash
-cd cli
+cd ccplugin/cli
 npm test
+# 84 tests, 14 test suites
 ```
 
 ## 许可证 / License

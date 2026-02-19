@@ -1,0 +1,20 @@
+{
+  "name": "codemap",
+  "version": "0.1.0",
+  "description": "AST-based code graph mapping plugin for Claude Code — scan once, persist structural graph, load compact slices to save ~95% tokens",
+  "author": {
+    "name": "killvxk",
+    "url": "https://github.com/killvxk"
+  },
+  "homepage": "https://github.com/killvxk/CodeMap",
+  "repository": "https://github.com/killvxk/CodeMap",
+  "license": "MIT",
+  "keywords": ["ast", "code-graph", "tree-sitter", "code-map", "scan", "slice", "incremental", "impact-analysis"],
+  "skills": [
+    "skills/scan",
+    "skills/load",
+    "skills/update",
+    "skills/query",
+    "skills/impact"
+  ]
+}

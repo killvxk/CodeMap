@@ -1,7 +1,10 @@
 node_modules/
 dist/
 .codemap/
-docs/
+docs/memory/
+docs/requirements.md
+docs/design.md
+docs/impl-notes/
 *.log
 *.tgz
 .DS_Store

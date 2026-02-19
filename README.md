@@ -49,23 +49,35 @@ node ccplugin/cli/bin/codegraph.js --version
 
 #### 4. 安装为 Claude Code 插件 / Install as Claude Code plugin
 
-```bash
-# 方式 A：直接安装本地目录（开发/个人使用推荐）
-# Option A: Install from local directory (recommended for dev/personal use)
-claude plugin add /absolute/path/to/CodeMap
+在 Claude Code 对话中执行以下命令（注意：这是 Claude Code 内部的斜杠命令，不是终端命令）：
 
-# 方式 B：从 GitHub 安装
-# Option B: Install from GitHub
-claude plugin add https://github.com/killvxk/CodeMap.git
+Run the following commands inside a Claude Code session (these are slash commands, not terminal commands):
+
+**方式 A：从本地目录安装（开发/个人使用推荐）/ Option A: Install from local directory**
+
+```
+/plugin marketplace add /absolute/path/to/CodeMap
+/plugin install codemap@codemap-plugins
 ```
 
-> **注意 / Note:** 路径必须是绝对路径，指向项目根目录（包含 `.claude-plugin/marketplace.json`）。Claude Code 会通过 `marketplace.json` 中的 `"source": "./ccplugin"` 自动定位插件目录，发现 skills 和 CLI 路径。
+**方式 B：从 GitHub 安装 / Option B: Install from GitHub**
+
+```
+/plugin marketplace add killvxk/CodeMap
+/plugin install codemap@codemap-plugins
+```
+
+安装后**重启 Claude Code** 使插件生效。
+
+After installation, **restart Claude Code** for the plugin to take effect.
+
+> **原理 / How it works:** Claude Code 读取根目录的 `.claude-plugin/marketplace.json`，其中 `"source": "./ccplugin"` 指向插件目录。然后从 `ccplugin/.claude-plugin/plugin.json` 加载插件清单，自动发现 `ccplugin/skills/` 下的所有 skill。
 >
-> The path must be absolute, pointing to the project root (containing `.claude-plugin/marketplace.json`). Claude Code uses `"source": "./ccplugin"` in `marketplace.json` to locate the plugin directory and auto-discover skills and CLI paths.
+> Claude Code reads `.claude-plugin/marketplace.json` at the repo root, where `"source": "./ccplugin"` points to the plugin directory. It then loads `ccplugin/.claude-plugin/plugin.json` and auto-discovers all skills under `ccplugin/skills/`.
 
 #### 5. 验证插件已安装 / Verify plugin installed
 
-在 Claude Code 中输入 / Type in Claude Code:
+重启 Claude Code 后，输入 / After restarting Claude Code, type:
 
 ```
 /scan
@@ -74,6 +86,12 @@ claude plugin add https://github.com/killvxk/CodeMap.git
 如果插件正确安装，该 skill 会被识别并触发代码扫描流程。
 
 If the plugin is installed correctly, this skill will be recognized and trigger the code scan workflow.
+
+#### 卸载 / Uninstall
+
+```
+/plugin uninstall codemap@codemap-plugins
+```
 
 ### 方式二：全局安装 CLI / Global CLI Installation
 

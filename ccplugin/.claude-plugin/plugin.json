@@ -9,12 +9,5 @@
   "homepage": "https://github.com/killvxk/CodeMap",
   "repository": "https://github.com/killvxk/CodeMap",
   "license": "MIT",
-  "keywords": ["ast", "code-graph", "tree-sitter", "code-map", "scan", "slice", "incremental", "impact-analysis"],
-  "skills": [
-    "skills/scan",
-    "skills/load",
-    "skills/update",
-    "skills/query",
-    "skills/impact"
-  ]
+  "keywords": ["ast", "code-graph", "tree-sitter", "code-map", "scan", "slice", "incremental", "impact-analysis"]
 }

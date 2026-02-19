@@ -1,0 +1,12 @@
+{
+  "name": "codemap",
+  "description": "Code graph mapping plugin - scan, cache, and load project architecture maps to save tokens",
+  "version": "0.1.0",
+  "skills": [
+    "skills/scan",
+    "skills/load",
+    "skills/update",
+    "skills/query",
+    "skills/impact"
+  ]
+}

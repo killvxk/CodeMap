@@ -1,0 +1,22 @@
+{
+  "name": "codegraph",
+  "version": "0.1.0",
+  "description": "AST-based code graph generator for Claude Code",
+  "type": "module",
+  "bin": {
+    "codegraph": "./bin/codegraph.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "commander": "^13.0.0",
+    "fast-glob": "^3.3.0",
+    "simple-git": "^3.27.0",
+    "web-tree-sitter": "^0.24.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  }
+}

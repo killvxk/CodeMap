@@ -1,6 +1,6 @@
 import path from 'path';
 import { scanProject } from '../scanner.js';
-import { saveGraph, computeFileHash, getGitCommitHash } from '../graph.js';
+import { saveGraph, getGitCommitHash } from '../graph.js';
 import { saveSlices } from '../slicer.js';
 
 /**

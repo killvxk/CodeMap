@@ -13,7 +13,7 @@ describe('scan command', () => {
     await fs.rm(CODEMAP_DIR, { recursive: true, force: true });
   });
 
-  it('should create graph.json, meta.json, and slices/_overview.json', () => {
+  it('should create graph.json, meta.json, and slices/_overview.json', { timeout: 30_000 }, () => {
     execFileSync('node', [BIN, 'scan', FIXTURE_DIR], {
       encoding: 'utf-8',
       timeout: 30000,

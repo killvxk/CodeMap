@@ -4,6 +4,10 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { TypeScriptAdapter } from './languages/typescript.js';
 import { GoAdapter } from './languages/go.js';
+import { PythonAdapter } from './languages/python.js';
+import { RustAdapter } from './languages/rust.js';
+import { JavaAdapter } from './languages/java.js';
+import { CppAdapter } from './languages/cpp.js';
 
 // web-tree-sitter uses CommonJS; import via createRequire for ESM compat.
 const require = createRequire(import.meta.url);
@@ -24,6 +28,8 @@ const adapters = new Map([
   ['python', new PythonAdapter()],
   ['rust', new RustAdapter()],
   ['java', new JavaAdapter()],
+  ['cpp', new CppAdapter()],
+  ['c', new CppAdapter()],
 ]);
 
 // ── WASM resolution ──────────────────────────────────────────────────────────

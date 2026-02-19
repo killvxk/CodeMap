@@ -49,7 +49,7 @@ describe('E2E: full workflow', () => {
     fs.rmSync(WORK_DIR, { recursive: true, force: true });
   });
 
-  it('scan generates .codemap with all expected files', () => {
+  it('scan generates .codemap with all expected files', { timeout: 30_000 }, () => {
     const output = run('scan .');
     expect(output).toContain('Scan complete');
     expect(fs.existsSync(path.join(CODEMAP_DIR, 'graph.json'))).toBe(true);

@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs/promises';
 import { loadGraph, loadMeta, saveGraph, computeFileHash, getGitCommitHash, isEntryPoint } from '../graph.js';
-import { traverseFiles, detectLanguage } from '../traverser.js';
+import { traverseFiles, detectLanguage, hasCppSourceFiles, effectiveLanguage } from '../traverser.js';
 import { initParser, parseFile } from '../parser.js';
 import { detectModuleName } from '../scanner.js';
 import { detectChangedFiles, mergeGraphUpdate } from '../differ.js';
@@ -37,6 +37,7 @@ export function registerUpdateCommand(program) {
 
       // Step 3: Traverse files and compute current hashes
       const files = await traverseFiles(rootDir);
+      const hasCpp = hasCppSourceFiles(files);
       const currentHashes = {};
 
       for (const absPath of files) {
@@ -66,8 +67,11 @@ export function registerUpdateCommand(program) {
 
       for (const relPath of changedPaths) {
         const absPath = path.resolve(rootDir, relPath);
-        const language = detectLanguage(absPath);
+        let language = detectLanguage(absPath);
         if (!language) continue;
+
+        // Reclassify .h files as C++ when the project contains C++ sources
+        language = effectiveLanguage(absPath, language, hasCpp);
 
         let content;
         try {
@@ -76,7 +80,7 @@ export function registerUpdateCommand(program) {
           continue;
         }
 
-        const hash = computeFileHash(content);
+        const hash = currentHashes[relPath];
 
         let parsed;
         try {

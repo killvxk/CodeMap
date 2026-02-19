@@ -12,7 +12,7 @@
  * @param {string} symbolName - The name to search for (case-sensitive substring match).
  * @param {object} [options] - Optional filters.
  * @param {'function'|'class'|'type'} [options.type] - Restrict search to a specific kind.
- * @returns {Array<{kind: string, name: string, signature?: string, file: string, module: string, lines: {start: number, end: number}, calls: string[], calledBy: string[]}>}
+ * @returns {Array<{kind: string, name: string, signature?: string, file: string, module: string, lines: {start: number, end: number}, fileImports: string[], importedBy: string[]}>}
  */
 export function querySymbol(graph, symbolName, options = {}) {
   const results = [];

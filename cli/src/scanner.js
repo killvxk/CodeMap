@@ -1,6 +1,6 @@
 import path from 'path';
 import fs from 'fs/promises';
-import { traverseFiles, detectLanguage } from './traverser.js';
+import { traverseFiles, detectLanguage, hasCppSourceFiles, effectiveLanguage } from './traverser.js';
 import { initParser, parseFile } from './parser.js';
 import { createEmptyGraph, computeFileHash, isEntryPoint } from './graph.js';
 
@@ -54,10 +54,7 @@ export async function scanProject(rootDir, options = {}) {
   const files = await traverseFiles(rootDir, { exclude: options.exclude || [] });
 
   // Detect whether the project contains C++ files, so we can treat .h as C++
-  const hasCppFiles = files.some(f => {
-    const ext = path.extname(f).toLowerCase();
-    return ['.cpp', '.cc', '.cxx', '.hpp', '.hh'].includes(ext);
-  });
+  const hasCppFiles = hasCppSourceFiles(files);
 
   // Index: absolute path (normalised with forward slashes) → parsed data + module
   const fileIndex = new Map();
@@ -72,9 +69,7 @@ export async function scanProject(rootDir, options = {}) {
     if (!language) continue;
 
     // Reclassify .h files as C++ when the project contains C++ sources
-    if (language === 'c' && hasCppFiles && path.extname(absPath).toLowerCase() === '.h') {
-      language = 'cpp';
-    }
+    language = effectiveLanguage(absPath, language, hasCppFiles);
 
     let content;
     try {

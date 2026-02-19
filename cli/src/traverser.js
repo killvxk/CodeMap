@@ -48,4 +48,26 @@ export async function traverseFiles(rootDir, options = {}) {
   return files.sort();
 }
 
+/** C++ file extensions (excluding .h which is shared with C). */
+const CPP_EXTENSIONS = new Set(['.cpp', '.cc', '.cxx', '.hpp', '.hh']);
+
+/**
+ * Check whether a list of absolute file paths contains any C++ source files.
+ * Used to decide if `.h` headers should be reclassified as C++.
+ */
+export function hasCppSourceFiles(files) {
+  return files.some(f => CPP_EXTENSIONS.has(path.extname(f).toLowerCase()));
+}
+
+/**
+ * Return the effective language for a file, applying `.h` → `cpp`
+ * reclassification when the project contains C++ sources.
+ */
+export function effectiveLanguage(filePath, baseLanguage, projectHasCpp) {
+  if (baseLanguage === 'c' && projectHasCpp && path.extname(filePath).toLowerCase() === '.h') {
+    return 'cpp';
+  }
+  return baseLanguage;
+}
+
 export { LANGUAGE_EXTENSIONS, ALL_EXTENSIONS };

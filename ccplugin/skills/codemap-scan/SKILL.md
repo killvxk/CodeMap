@@ -1,5 +1,5 @@
 ---
-name: scan
+name: codemap-scan
 description: >
   Use when the user wants to scan or index a project codebase, when .codemap/ directory
   does not exist, when starting work on a new project for the first time, or when

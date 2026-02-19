@@ -175,12 +175,12 @@ CodeMap/
 ├── ccplugin/                   # 插件根目录 (CLAUDE_PLUGIN_ROOT)
 │   ├── .claude-plugin/
 │   │   └── plugin.json         #   插件清单 / Plugin manifest
-│   ├── skills/                 #   Claude Code Skills (自动触发)
-│   │   ├── scan/SKILL.md       #     /scan - 全量扫描
-│   │   ├── load/SKILL.md       #     /load - 智能加载
-│   │   ├── update/SKILL.md     #     /update - 增量更新
-│   │   ├── query/SKILL.md      #     /query - 符号查询
-│   │   └── impact/SKILL.md     #     /impact - 影响分析
+│   ├── skills/                         #   Claude Code Skills (自动触发)
+│   │   ├── codemap-scan/SKILL.md       #     全量扫描
+│   │   ├── codemap-load/SKILL.md       #     智能加载
+│   │   ├── codemap-update/SKILL.md     #     增量更新
+│   │   ├── codemap-query/SKILL.md      #     符号查询
+│   │   └── codemap-impact/SKILL.md     #     影响分析
 │   └── cli/                    #   CLI 工具
 │       ├── bin/codegraph.js    #     入口 / Entry point
 │       ├── src/                #     源码 / Source
@@ -250,11 +250,11 @@ When installed as a Claude Code plugin, these skills auto-trigger based on conve
 
 | Skill | 触发词 / Triggers On |
 |-------|------------|
-| `/scan` | "扫描", "索引", "scan", "index", "map codebase" |
-| `/load` | "加载图谱", "项目结构", "load", "code structure" |
-| `/update` | "更新图谱", "refresh", "代码改了" |
-| `/query` | "查找", "谁调用了", "where is", "find function" |
-| `/impact` | "影响范围", "refactor impact", "change impact" |
+| `codemap-scan` | "扫描", "索引", "scan", "index", "map codebase" |
+| `codemap-load` | "加载图谱", "项目结构", "load", "code structure" |
+| `codemap-update` | "更新图谱", "refresh", "代码改了" |
+| `codemap-query` | "查找", "谁调用了", "where is", "find function" |
+| `codemap-impact` | "影响范围", "refactor impact", "change impact" |
 
 ### 典型工作流 / Typical Workflow
 

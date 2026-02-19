@@ -1,5 +1,5 @@
 ---
-name: update
+name: codemap-update
 description: >
   Use after code has been modified, after git commits, when the code graph
   might be outdated, or when the user says "更新图谱", "同步", "refresh",

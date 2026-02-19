@@ -1,5 +1,5 @@
 ---
-name: impact
+name: codemap-impact
 description: >
   Use when the user wants to know the impact of changing a file or module,
   when planning refactoring, or when assessing risk of a code change.

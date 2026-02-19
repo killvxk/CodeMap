@@ -1,5 +1,5 @@
 ---
-name: query
+name: codemap-query
 description: >
   Use when the user asks about a specific function, class, type, or module
   in a project that has .codemap/.

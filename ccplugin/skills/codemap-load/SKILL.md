@@ -1,5 +1,5 @@
 ---
-name: load
+name: codemap-load
 description: >
   Use when starting work on a project that has a .codemap/ directory, when the user
   asks about project structure or architecture, when the user wants to understand

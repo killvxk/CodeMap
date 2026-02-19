@@ -143,6 +143,67 @@ ignore = "0.4"           # .gitignore 支持
 - 将预编译二进制放入 ccplugin/bin/
 - 最终验证插件安装流程
 
+## 待办：Skills → Commands + Hook 迁移
+
+### 问题
+
+当前 5 个功能（scan、load、update、query、impact）全部实现为 skills。存在以下问题：
+- 名称冲突风险：`scan`、`load`、`update`、`query` 过于通用，可能与其他插件冲突
+- 误触发：skill 根据 description 关键词自动激活，"扫描"、"查找"、"更新" 在日常对话中极其常见，可能在无关上下文中触发
+- 不可控：用户讨论非 CodeMap 相关的 scan/query 时也可能被激活
+
+### 方案：Commands + Hook 混合模式
+
+**Commands（明确操作）：**
+
+将 5 个 skill 转为 commands，获得 `codemap:` 命名空间隔离：
+
+| 当前 (skill) | 迁移后 (command) | 说明 |
+|-------------|-----------------|------|
+| `/scan` | `/codemap:scan` | 全量扫描 |
+| `/load` | `/codemap:load` | 加载图谱 |
+| `/update` | `/codemap:update` | 增量更新 |
+| `/query` | `/codemap:query` | 符号查询 |
+| `/impact` | `/codemap:impact` | 影响分析 |
+
+文件变更：`ccplugin/skills/*/SKILL.md` → `ccplugin/commands/*.md`，调整 frontmatter 格式。
+
+**Hook（自动触发）：**
+
+添加 `SessionStart` hook 实现自动上下文恢复：
+
+```json
+{
+  "hooks": {
+    "SessionStart": [{
+      "hooks": [{
+        "type": "command",
+        "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/session-start.sh\"",
+        "timeout": 10,
+        "statusMessage": "CodeMap: 检测项目图谱..."
+      }]
+    }]
+  }
+}
+```
+
+`session-start.sh` 逻辑：
+1. 检测当前工作目录是否存在 `.codemap/graph.json`
+2. 如果存在 → 输出提示信息，建议用户使用 `/codemap:load` 加载图谱
+3. 如果不存在 → 静默退出，不干扰用户
+
+这样既实现了自动触发（提示用户图谱可用），又避免了 skill 误触发的问题。
+
+### 迁移状态
+
+- [ ] 将 5 个 skills 转为 commands
+- [ ] 创建 SessionStart hook 脚本
+- [ ] 创建 hooks/hooks.json
+- [ ] 更新 README 中的 skill 相关文档
+- [ ] 测试安装验证
+
+---
+
 ## 兼容性约束
 
 - `.codemap/` 输出目录格式必须与 Node.js 版本完全一致

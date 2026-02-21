@@ -25,7 +25,7 @@ ls .codemap/graph.json 2>/dev/null && echo "CODEMAP_EXISTS" || echo "NO_CODEMAP"
 ### 2. 执行全量扫描
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/cli/bin/codegraph.js" scan {{dir:-.}}
+"${CLAUDE_PLUGIN_ROOT}/bin/codegraph" scan {{dir:-.}}
 ```
 
 ### 3. 展示扫描摘要

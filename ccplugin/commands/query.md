@@ -19,7 +19,7 @@ arguments:
 ### 1. 执行查询
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/cli/bin/codegraph.js" query "{{symbol}}" {{#type}}--type {{type}}{{/type}}
+"${CLAUDE_PLUGIN_ROOT}/bin/codegraph" query "{{symbol}}" {{#type}}--type {{type}}{{/type}}
 ```
 
 ### 2. 展示结果

@@ -35,23 +35,25 @@ ccplugin/
 │   ├── codegraph-x86_64-darwin        # macOS x64
 │   ├── codegraph-aarch64-darwin       # macOS ARM64 (Apple Silicon)
 │   └── codegraph-x86_64-windows.exe   # Windows x64
-├── skills/                             # 不变
-└── .claude-plugin/plugin.json          # 不变
+├── commands/                           # 斜杠命令（已有，路径需更新）
+├── skills/codemap/SKILL.md            # 统一入口 skill（已有）
+├── hooks/                             # SessionStart hook（已有）
+└── .claude-plugin/plugin.json
 ```
 
-### SKILL.md 路径变更
+### Commands 路径变更
 
-从：
+当前 `ccplugin/commands/*.md` 中的 CLI 调用路径：
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/cli/bin/codegraph.js" scan .
 ```
 
-改为（需要平台检测脚本或直接引用）：
+Rust 重写后改为：
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/bin/codegraph" scan .
 ```
 
-> 需要一个 wrapper 脚本或在 SKILL 中根据平台选择正确的二进制名。
+> 需要一个 wrapper 脚本根据平台选择正确的二进制名（codegraph-x86_64-linux 等），或在阶段 6 中实现平台检测逻辑。
 
 ### Rust 项目结构
 
@@ -143,27 +145,19 @@ ignore = "0.4"           # .gitignore 支持
 - 将预编译二进制放入 ccplugin/bin/
 - 最终验证插件安装流程
 
-## 已完成：Skill 命名空间隔离
+## 已完成：插件结构重构 (v0.2.0)
 
-### 问题
+### Skill 命名空间隔离 ✅
 
-原 skill 名称（scan、load、update、query、impact）过于通用，可能与其他插件冲突或在无关对话中误触发。
+原 5 个独立 skill（scan、load、update、query、impact）已重构为：
 
-### 方案（已实施）
+- 1 个统一入口 skill（`skills/codemap/SKILL.md`）— 智能路由，自动判断操作
+- 5 个斜杠命令（`commands/*.md`）— 用户可手动 `/codemap:codemap-scan` 等直接调用
+- 命令名使用 `codemap-` 前缀避免冲突
 
-保留 skills 自动触发能力，通过 `codemap-` 前缀实现命名空间隔离：
+### SessionStart Hook ✅
 
-| 原名 | 新名 |
-|------|------|
-| `scan` | `codemap-scan` |
-| `load` | `codemap-load` |
-| `update` | `codemap-update` |
-| `query` | `codemap-query` |
-| `impact` | `codemap-impact` |
-
-### 待办：SessionStart Hook
-
-后续可添加 `SessionStart` hook 实现会话启动时自动检测 `.codemap/` 并提示加载。
+已添加 `hooks/hooks.json` + `hooks/scripts/detect-codemap.sh`，会话启动时自动检测 `.codemap/` 并提示用户。
 
 ---
 
@@ -181,10 +175,10 @@ ignore = "0.4"           # .gitignore 支持
 
 ## 状态
 
-- [ ] 阶段 1：Rust 项目脚手架
-- [ ] 阶段 2：核心引擎移植
-- [ ] 阶段 3：语言适配器
-- [ ] 阶段 4：高级功能
-- [ ] 阶段 5：测试与兼容性
-- [ ] 阶段 6：CI/CD 与分发
-- [ ] 阶段 7：清理
+- [x] 阶段 1：Rust 项目脚手架
+- [x] 阶段 2：核心引擎移植
+- [x] 阶段 3：语言适配器
+- [x] 阶段 4：高级功能
+- [x] 阶段 5：测试与兼容性（282 个测试，全部通过）
+- [x] 阶段 6：CI/CD 与分发（GitHub Actions 5 平台交叉编译 + wrapper 脚本）
+- [x] 阶段 7：清理（文档更新、hooks 脚本、.gitignore、路径迁移）

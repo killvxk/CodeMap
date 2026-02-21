@@ -30,7 +30,7 @@ ls .codemap/graph.json 2>/dev/null && echo "CODEMAP_EXISTS" || echo "NO_CODEMAP"
 ### Step 2: 检查图谱新鲜度
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/cli/bin/codegraph.js" status
+"${CLAUDE_PLUGIN_ROOT}/bin/codegraph" status
 ```
 
 - **过期**（commit hash 不匹配 HEAD 或距上次更新超过 1 天）→ 建议先执行 `/codemap:codemap-update` 增量更新。

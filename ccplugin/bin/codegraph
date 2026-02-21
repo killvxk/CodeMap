@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# codegraph — platform-detecting wrapper
+# 根据当前 OS 和 CPU 架构选择正确的预编译二进制并执行
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# 检测 OS
+case "$(uname -s 2>/dev/null)" in
+  Linux*)   _OS="linux" ;;
+  Darwin*)  _OS="macos" ;;
+  MINGW*|MSYS*|CYGWIN*) _OS="windows" ;;
+  *)
+    echo "[CodeMap] Unsupported OS: $(uname -s)" >&2
+    exit 1
+    ;;
+esac
+
+# 检测 CPU 架构
+case "$(uname -m 2>/dev/null)" in
+  x86_64|amd64)  _ARCH="x86_64" ;;
+  aarch64|arm64) _ARCH="aarch64" ;;
+  *)
+    echo "[CodeMap] Unsupported architecture: $(uname -m)" >&2
+    exit 1
+    ;;
+esac
+
+# 构造二进制路径
+_BIN_NAME="codegraph-${_ARCH}-${_OS}"
+if [ "$_OS" = "windows" ]; then
+  _BIN_NAME="${_BIN_NAME}.exe"
+fi
+
+_BIN_PATH="${SCRIPT_DIR}/${_BIN_NAME}"
+
+if [ ! -f "$_BIN_PATH" ]; then
+  echo "[CodeMap] Binary not found: ${_BIN_PATH}" >&2
+  echo "[CodeMap] Please download the release binary for ${_ARCH}-${_OS} from:" >&2
+  echo "[CodeMap]   https://github.com/killvxk/CodeMap/releases" >&2
+  exit 1
+fi
+
+exec "$_BIN_PATH" "$@"

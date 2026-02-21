@@ -6,7 +6,7 @@ AST-based code graph mapping plugin for [Claude Code](https://docs.anthropic.com
 
 ## 特性 / Features
 
-- **AST 解析 / AST Parsing** — 使用 tree-sitter (WASM) 进行精确的结构分析，非正则猜测 / Uses tree-sitter (WASM) for accurate structural analysis, no regex guessing
+- **AST 解析 / AST Parsing** — 使用 tree-sitter 原生绑定进行精确的结构分析，非正则猜测 / Uses tree-sitter native bindings for accurate structural analysis, no regex guessing
 - **多语言支持 / Multi-Language** — TypeScript, JavaScript, Python, Go, Rust, Java, C, C++
 - **智能切片 / Smart Slicing** — 项目概览 (~500 tokens) + 按模块切片 (~2-5k tokens)，替代全量源码 (~200k+) / Project overview (~500 tokens) + per-module slices (~2-5k tokens) instead of full source (~200k+)
 - **增量更新 / Incremental Updates** — 基于文件哈希比较检测变更，仅重新解析修改的文件 / File hash comparison detects changes; only re-parses modified files
@@ -19,8 +19,6 @@ AST-based code graph mapping plugin for [Claude Code](https://docs.anthropic.com
 
 ### 前置条件 / Prerequisites
 
-- **Node.js** >= 18
-- **npm** >= 9
 - **Claude Code** CLI ([安装指南 / Install Guide](https://docs.anthropic.com/en/docs/claude-code))
 
 ### 方式一：作为 Claude Code 插件安装（推荐）/ Install as Claude Code Plugin (Recommended)
@@ -32,22 +30,26 @@ git clone https://github.com/killvxk/CodeMap.git
 cd CodeMap
 ```
 
-#### 2. 安装 CLI 依赖 / Install CLI dependencies
+#### 2. 验证 CLI 可用 / Verify CLI works
+
+预编译二进制已包含在 `ccplugin/bin/` 目录中，无需额外安装依赖：
+
+The pre-compiled binary is included in `ccplugin/bin/` — no additional dependencies required:
 
 ```bash
-cd ccplugin/cli
-npm install
-cd ../..
+# Linux / macOS
+ccplugin/bin/codegraph-linux --version    # Linux x64
+ccplugin/bin/codegraph-macos --version    # macOS (Intel/Apple Silicon)
+
+# Windows (Git Bash / PowerShell)
+ccplugin/bin/codegraph-windows.exe --version
 ```
 
-#### 3. 验证 CLI 可用 / Verify CLI works
+> 如果 `ccplugin/bin/` 中没有适合你平台的二进制，可以从 [GitHub Releases](https://github.com/killvxk/CodeMap/releases) 下载，或参考下方"从源码构建"说明。
+>
+> If no binary matches your platform in `ccplugin/bin/`, download from [GitHub Releases](https://github.com/killvxk/CodeMap/releases) or see "Build from Source" below.
 
-```bash
-node ccplugin/cli/bin/codegraph.js --version
-# 输出 / Output: 0.1.0
-```
-
-#### 4. 安装为 Claude Code 插件 / Install as Claude Code plugin
+#### 3. 安装为 Claude Code 插件 / Install as Claude Code plugin
 
 在 Claude Code 对话中执行以下命令（注意：这是 Claude Code 内部的斜杠命令，不是终端命令）：
 
@@ -75,7 +77,7 @@ After installation, **restart Claude Code** for the plugin to take effect.
 >
 > Claude Code reads `.claude-plugin/marketplace.json` at the repo root, where `"source": "./ccplugin"` points to the plugin directory. It then loads `ccplugin/.claude-plugin/plugin.json` and auto-discovers commands in `ccplugin/commands/`, skills in `ccplugin/skills/`, and hooks in `ccplugin/hooks/`.
 
-#### 5. 验证插件已安装 / Verify plugin installed
+#### 4. 验证插件已安装 / Verify plugin installed
 
 重启 Claude Code 后，输入 / After restarting Claude Code, type:
 
@@ -93,17 +95,25 @@ If the plugin is installed correctly, this command will trigger the code scan wo
 /plugin uninstall codemap@codemap-plugins
 ```
 
-### 方式二：全局安装 CLI / Global CLI Installation
+### 方式二：下载预编译二进制 / Download Pre-compiled Binary
 
-如果你只需要 CLI 工具（不需要 Claude Code 插件集成）：
+从 [GitHub Releases](https://github.com/killvxk/CodeMap/releases) 下载适合你平台的二进制文件：
 
-If you only need the CLI tool (without Claude Code plugin integration):
+Download the binary for your platform from [GitHub Releases](https://github.com/killvxk/CodeMap/releases):
 
 ```bash
-git clone https://github.com/killvxk/CodeMap.git
-cd CodeMap/ccplugin/cli
-npm install
-npm link
+# Linux x64
+curl -L https://github.com/killvxk/CodeMap/releases/latest/download/codegraph-linux -o codegraph
+chmod +x codegraph
+sudo mv codegraph /usr/local/bin/
+
+# macOS (Intel / Apple Silicon — 通用二进制)
+curl -L https://github.com/killvxk/CodeMap/releases/latest/download/codegraph-macos -o codegraph
+chmod +x codegraph
+sudo mv codegraph /usr/local/bin/
+
+# Windows (PowerShell)
+Invoke-WebRequest -Uri https://github.com/killvxk/CodeMap/releases/latest/download/codegraph-windows.exe -OutFile codegraph.exe
 ```
 
 安装后可以直接使用 `codegraph` 命令：
@@ -116,51 +126,43 @@ codegraph status /path/to/project
 codegraph query handleLogin --dir /path/to/project
 ```
 
-### 方式三：构建发布包 / Build Release Distribution
+### 方式三：从源码构建 / Build from Source
 
-用于将 CLI 打包分发给他人或部署到 CI。
+需要 Rust 工具链（[rustup.rs](https://rustup.rs)）：
 
-For packaging the CLI to distribute or deploy in CI.
-
-#### 生成 npm tarball / Generate npm tarball
+Requires Rust toolchain ([rustup.rs](https://rustup.rs)):
 
 ```bash
-cd ccplugin/cli
-npm pack
-# 生成 / Produces: codegraph-0.1.0.tgz
-```
-
-#### 从 tarball 安装 / Install from tarball
-
-```bash
-npm install -g codegraph-0.1.0.tgz
-codegraph --version
+git clone https://github.com/killvxk/CodeMap.git
+cd CodeMap/rust-cli
+cargo build --release
+# 二进制输出到 / Binary at: target/release/codegraph
 ```
 
 #### GitHub Release 发布流程 / GitHub Release Workflow
 
 ```bash
 # 1. 确保测试通过 / Ensure tests pass
-cd ccplugin/cli && npm test
+cd rust-cli && cargo test
 
-# 2. 更新版本号 / Bump version
-npm version patch  # 或 minor / major
+# 2. 交叉编译所有平台 / Cross-compile for all platforms
+cargo build --release --target x86_64-unknown-linux-gnu
+cargo build --release --target aarch64-apple-darwin
+cargo build --release --target x86_64-pc-windows-gnu
 
-# 3. 生成发布包 / Generate release package
-npm pack
-
-# 4. 提交并打 tag / Commit and tag
-cd ../..
+# 3. 提交并打 tag / Commit and tag
+cd ..
 git add .
-git commit -m "release: v$(node -p "require('./ccplugin/cli/package.json').version")"
-git tag "v$(node -p "require('./ccplugin/cli/package.json').version")"
+git commit -m "release: v0.2.0"
+git tag v0.2.0
 git push origin main --tags
 
-# 5. 在 GitHub 创建 Release，上传 .tgz 文件
-# Create a GitHub Release and upload the .tgz file
-gh release create "v$(node -p "require('./ccplugin/cli/package.json').version")" \
-  ccplugin/cli/codegraph-*.tgz \
-  --title "CodeMap v$(node -p "require('./ccplugin/cli/package.json').version")" \
+# 4. 在 GitHub 创建 Release，上传二进制 / Create GitHub Release and upload binaries
+gh release create v0.2.0 \
+  ccplugin/bin/codegraph-linux \
+  ccplugin/bin/codegraph-macos \
+  ccplugin/bin/codegraph-windows.exe \
+  --title "CodeMap v0.2.0" \
   --generate-notes
 ```
 
@@ -187,22 +189,24 @@ CodeMap/
 │   │   ├── hooks.json          #     SessionStart 自动检测
 │   │   └── scripts/
 │   │       └── detect-codemap.sh
-│   └── cli/                    #   CLI 工具
-│       ├── bin/codegraph.js    #     入口 / Entry point
-│       ├── src/                #     源码 / Source
-│       │   ├── index.js        #       Commander 注册
-│       │   ├── scanner.js      #       全量扫描引擎
-│       │   ├── parser.js       #       tree-sitter WASM 解析
-│       │   ├── graph.js        #       图谱数据结构
-│       │   ├── differ.js       #       增量更新引擎
-│       │   ├── query.js        #       查询引擎
-│       │   ├── slicer.js       #       切片生成
-│       │   ├── impact.js       #       影响分析
-│       │   ├── traverser.js    #       文件遍历与语言检测
-│       │   ├── commands/       #       CLI 命令实现
-│       │   └── languages/      #       语言适配器 (8 种)
-│       ├── test/               #     测试 (84 tests)
-│       └── package.json
+│   └── bin/                    #   预编译二进制 / Pre-compiled binaries
+│       ├── codegraph-linux     #     Linux x64
+│       ├── codegraph-macos     #     macOS (Intel + Apple Silicon)
+│       └── codegraph-windows.exe #   Windows x64
+├── rust-cli/                   # Rust CLI 源码 / Rust CLI source
+│   ├── Cargo.toml
+│   ├── src/
+│   │   ├── main.rs             #   CLI 入口（clap）
+│   │   ├── scanner.rs          #   全量扫描引擎
+│   │   ├── graph.rs            #   图谱数据结构
+│   │   ├── differ.rs           #   增量更新引擎
+│   │   ├── query.rs            #   查询引擎
+│   │   ├── slicer.rs           #   切片生成
+│   │   ├── impact.rs           #   影响分析
+│   │   ├── path_utils.rs       #   共享路径工具函数
+│   │   ├── traverser.rs        #   文件遍历与语言检测
+│   │   └── languages/          #   语言适配器 (8 种)
+│   └── tests/                  #   集成测试 (286 tests)
 ├── README.md
 └── LICENSE                     # MIT
 ```
@@ -211,9 +215,9 @@ CodeMap/
 
 ## CLI 命令 / CLI Commands
 
-所有命令通过 `codegraph <command>` 或 `node ccplugin/cli/bin/codegraph.js <command>` 运行。
+所有命令通过 `codegraph <command>` 运行（预编译二进制，无需 Node.js）。
 
-All commands run via `codegraph <command>` or `node ccplugin/cli/bin/codegraph.js <command>`.
+All commands run via `codegraph <command>` (pre-compiled binary, no Node.js required).
 
 | 命令 / Command | 描述 / Description |
 |---------|-------------|
@@ -322,9 +326,9 @@ Scanning produces a `.codemap/` directory inside the target project:
 ## 测试 / Tests
 
 ```bash
-cd ccplugin/cli
-npm test
-# 84 tests, 14 test suites
+cd rust-cli
+cargo test
+# 286 tests, all passing
 ```
 
 ## 许可证 / License

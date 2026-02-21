@@ -12,7 +12,7 @@ description: 增量更新代码图谱，只重新解析变更的文件
 ### 1. 执行增量更新
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/cli/bin/codegraph.js" update
+"${CLAUDE_PLUGIN_ROOT}/bin/codegraph" update
 ```
 
 CLI 会自动：

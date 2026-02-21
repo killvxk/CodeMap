@@ -19,7 +19,7 @@ arguments:
 ### 1. 执行影响分析
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/cli/bin/codegraph.js" impact "{{target}}" --depth {{depth:-3}}
+"${CLAUDE_PLUGIN_ROOT}/bin/codegraph" impact "{{target}}" --depth {{depth:-3}}
 ```
 
 `<target>` 可以是模块名（如 `auth`）或文件路径（如 `src/auth/login.ts`）。

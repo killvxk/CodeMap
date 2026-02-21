@@ -7,13 +7,13 @@
   },
   "metadata": {
     "description": "AST-based code graph mapping plugin for Claude Code — scan once, persist structural graph, load compact slices to save ~95% tokens",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "plugins": [
     {
       "name": "codemap",
       "description": "AST-based code graph mapping plugin — scan codebase, persist structural graph, load compact slices in future sessions, saving ~95% tokens compared to re-reading all source files",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "source": "./ccplugin",
       "category": "productivity",
       "author": { "name": "killvxk" },

@@ -71,21 +71,21 @@ Run the following commands inside a Claude Code session (these are slash command
 
 After installation, **restart Claude Code** for the plugin to take effect.
 
-> **原理 / How it works:** Claude Code 读取根目录的 `.claude-plugin/marketplace.json`，其中 `"source": "./ccplugin"` 指向插件目录。然后从 `ccplugin/.claude-plugin/plugin.json` 加载插件清单，自动发现 `ccplugin/skills/` 下的所有 skill。
+> **原理 / How it works:** Claude Code 读取根目录的 `.claude-plugin/marketplace.json`，其中 `"source": "./ccplugin"` 指向插件目录。然后从 `ccplugin/.claude-plugin/plugin.json` 加载插件清单，自动发现 `ccplugin/commands/` 下的斜杠命令、`ccplugin/skills/` 下的 skill、以及 `ccplugin/hooks/` 下的事件钩子。
 >
-> Claude Code reads `.claude-plugin/marketplace.json` at the repo root, where `"source": "./ccplugin"` points to the plugin directory. It then loads `ccplugin/.claude-plugin/plugin.json` and auto-discovers all skills under `ccplugin/skills/`.
+> Claude Code reads `.claude-plugin/marketplace.json` at the repo root, where `"source": "./ccplugin"` points to the plugin directory. It then loads `ccplugin/.claude-plugin/plugin.json` and auto-discovers commands in `ccplugin/commands/`, skills in `ccplugin/skills/`, and hooks in `ccplugin/hooks/`.
 
 #### 5. 验证插件已安装 / Verify plugin installed
 
 重启 Claude Code 后，输入 / After restarting Claude Code, type:
 
 ```
-/scan
+/codemap:codemap-scan
 ```
 
-如果插件正确安装，该 skill 会被识别并触发代码扫描流程。
+如果插件正确安装，该命令会触发代码扫描流程。
 
-If the plugin is installed correctly, this skill will be recognized and trigger the code scan workflow.
+If the plugin is installed correctly, this command will trigger the code scan workflow.
 
 #### 卸载 / Uninstall
 
@@ -175,12 +175,18 @@ CodeMap/
 ├── ccplugin/                   # 插件根目录 (CLAUDE_PLUGIN_ROOT)
 │   ├── .claude-plugin/
 │   │   └── plugin.json         #   插件清单 / Plugin manifest
-│   ├── skills/                         #   Claude Code Skills (自动触发)
-│   │   ├── codemap-scan/SKILL.md       #     全量扫描
-│   │   ├── codemap-load/SKILL.md       #     智能加载
-│   │   ├── codemap-update/SKILL.md     #     增量更新
-│   │   ├── codemap-query/SKILL.md      #     符号查询
-│   │   └── codemap-impact/SKILL.md     #     影响分析
+│   ├── commands/               #   斜杠命令 / Slash commands
+│   │   ├── scan.md             #     /codemap:codemap-scan
+│   │   ├── load.md             #     /codemap:codemap-load
+│   │   ├── update.md           #     /codemap:codemap-update
+│   │   ├── query.md            #     /codemap:codemap-query
+│   │   └── impact.md           #     /codemap:codemap-impact
+│   ├── skills/                 #   自动触发 Skill / Auto-triggering skill
+│   │   └── codemap/SKILL.md    #     统一入口，智能路由 / Unified entry, smart routing
+│   ├── hooks/                  #   事件钩子 / Event hooks
+│   │   ├── hooks.json          #     SessionStart 自动检测
+│   │   └── scripts/
+│   │       └── detect-codemap.sh
 │   └── cli/                    #   CLI 工具
 │       ├── bin/codegraph.js    #     入口 / Entry point
 │       ├── src/                #     源码 / Source
@@ -242,28 +248,39 @@ codegraph impact auth --depth 3 --dir /path/to/project
 
 ---
 
-## Skills
+## Skills & Commands
 
-作为 Claude Code 插件安装后，以下 skill 会根据对话上下文自动触发：
+作为 Claude Code 插件安装后，提供以下能力：
 
-When installed as a Claude Code plugin, these skills auto-trigger based on conversation context:
+When installed as a Claude Code plugin, the following capabilities are available:
 
-| Skill | 触发词 / Triggers On |
+### 自动触发 / Auto-Triggering
+
+`codemap` skill 会根据对话上下文自动激活，智能判断该执行哪个操作。同时 `SessionStart` hook 会在每次会话开始时自动检测 `.codemap/` 是否存在并提示。
+
+The `codemap` skill auto-activates based on conversation context and intelligently routes to the right operation. A `SessionStart` hook also detects `.codemap/` at session start.
+
+### 斜杠命令 / Slash Commands
+
+也可以手动调用：/ You can also invoke manually:
+
+| 命令 / Command | 描述 / Description |
 |-------|------------|
-| `codemap-scan` | "扫描", "索引", "scan", "index", "map codebase" |
-| `codemap-load` | "加载图谱", "项目结构", "load", "code structure" |
-| `codemap-update` | "更新图谱", "refresh", "代码改了" |
-| `codemap-query` | "查找", "谁调用了", "where is", "find function" |
-| `codemap-impact` | "影响范围", "refactor impact", "change impact" |
+| `/codemap:codemap-scan` | 全量扫描项目，生成 .codemap/ 图谱 / Full scan, generate .codemap/ graph |
+| `/codemap:codemap-load [target]` | 加载图谱到上下文（概览/模块/文件）/ Load graph into context |
+| `/codemap:codemap-update` | 增量更新图谱 / Incremental update |
+| `/codemap:codemap-query <symbol>` | 查询符号定义和调用关系 / Query symbol definitions and call relations |
+| `/codemap:codemap-impact <target>` | 分析变更影响范围 / Analyze change impact |
 
 ### 典型工作流 / Typical Workflow
 
 ```
-1. 首次使用 / First time:     /scan           → 生成 .codemap/ 图谱
-2. 新会话开始 / New session:   /load           → 加载概览 (~500 tokens)
-3. 深入模块 / Dive into module: /load auth     → 加载 auth 模块 (~2-5k tokens)
-4. 代码修改后 / After changes: /update         → 增量更新图谱
-5. 重构前 / Before refactor:   /impact auth    → 查看影响范围
+1. 首次使用 / First time:     /codemap:codemap-scan       → 生成 .codemap/ 图谱
+2. 新会话开始 / New session:   (自动检测 / auto-detected)  → SessionStart hook 提示加载
+3. 加载概览 / Load overview:   /codemap:codemap-load       → 加载概览 (~500 tokens)
+4. 深入模块 / Dive into module: /codemap:codemap-load auth → 加载 auth 模块 (~2-5k tokens)
+5. 代码修改后 / After changes: /codemap:codemap-update     → 增量更新图谱
+6. 重构前 / Before refactor:   /codemap:codemap-impact auth → 查看影响范围
 ```
 
 ---

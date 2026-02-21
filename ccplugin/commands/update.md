@@ -1,13 +1,9 @@
 ---
 name: codemap-update
-description: >
-  Use after code has been modified, after git commits, when the code graph
-  might be outdated, or when the user says "更新图谱", "同步", "refresh",
-  "update map", "代码改了", "图谱过期", "刷新", "重新索引变更".
-  Also use when /load detects the graph commit hash doesn't match current HEAD.
+description: 增量更新代码图谱，只重新解析变更的文件
 ---
 
-# CodeMap Update -- 增量更新图谱
+# CodeMap Update — 增量更新图谱
 
 基于文件哈希比较，只重新解析变更的文件，将更新合并到现有图谱。
 
@@ -28,7 +24,7 @@ CLI 会自动：
 
 ### 2. 展示变更摘要
 
-向用户报告 CLI 输出中的信息：
+向用户报告：
 - 新增文件数 (+N)
 - 修改文件数 (~N)
 - 删除文件数 (-N)
@@ -36,4 +32,4 @@ CLI 会自动：
 
 ### 3. 刷新已加载的上下文
 
-如果当前会话已经通过 `/load` 加载了某些模块的图谱，且这些模块受到更新影响，重新执行 `/load` 刷新上下文。
+如果当前会话已经通过 `/codemap:codemap-load` 加载了某些模块的图谱，且这些模块受到更新影响，重新执行加载刷新上下文。

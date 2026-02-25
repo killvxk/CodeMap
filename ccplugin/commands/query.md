@@ -1,5 +1,5 @@
 ---
-name: codemap-query
+name: query
 description: 在代码图谱中查询函数、类、类型的定义位置和调用关系
 arguments:
   - name: symbol

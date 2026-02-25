@@ -75,9 +75,9 @@ fi
 # ── 检测 .codemap/ 图谱 ───────────────────────────────────────────────────────
 
 if [ -f ".codemap/graph.json" ]; then
-  echo "[CodeMap] 检测到 .codemap/ 图谱已存在。建议使用 /codemap:codemap-load 加载项目上下文，或 /codemap:codemap-update 更新图谱。"
+  echo "[CodeMap] 检测到 .codemap/ 图谱已存在。建议使用 /codemap:load 加载项目上下文，或 /codemap:update 更新图谱。"
 else
-  echo "[CodeMap] 未检测到 .codemap/ 图谱。如需生成代码图谱，请使用 /codemap:codemap-scan。"
+  echo "[CodeMap] 未检测到 .codemap/ 图谱。如需生成代码图谱，请使用 /codemap:scan。"
 fi
 
 # ── 输出二进制状态 ────────────────────────────────────────────────────────────

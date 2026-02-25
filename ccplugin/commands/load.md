@@ -1,5 +1,5 @@
 ---
-name: codemap-load
+name: load
 description: 从 .codemap/ 加载代码图谱到当前会话上下文，支持加载概览、指定模块或文件
 arguments:
   - name: target
@@ -19,7 +19,7 @@ arguments:
 ls .codemap/graph.json 2>/dev/null && echo "CODEMAP_EXISTS" || echo "NO_CODEMAP"
 ```
 
-如果不存在，建议用户先执行 `/codemap:codemap-scan` 生成图谱。
+如果不存在，建议用户先执行 `/codemap:scan` 生成图谱。
 
 ### 2. 检查图谱新鲜度
 
@@ -27,7 +27,7 @@ ls .codemap/graph.json 2>/dev/null && echo "CODEMAP_EXISTS" || echo "NO_CODEMAP"
 "${CLAUDE_PLUGIN_ROOT}/bin/codegraph" status
 ```
 
-如果图谱可能过期（commit hash 不匹配或距离上次更新很久），建议先执行 `/codemap:codemap-update`。
+如果图谱可能过期（commit hash 不匹配或距离上次更新很久），建议先执行 `/codemap:update`。
 
 ### 3. 加载策略
 

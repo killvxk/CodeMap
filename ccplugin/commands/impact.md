@@ -1,5 +1,5 @@
 ---
-name: codemap-impact
+name: impact
 description: 分析修改某个模块或文件的影响范围，用于重构前的风险评估
 arguments:
   - name: target

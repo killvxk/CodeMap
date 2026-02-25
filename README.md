@@ -101,7 +101,7 @@ After installation, **restart Claude Code** for the plugin to take effect.
 重启 Claude Code 后，输入 / After restarting Claude Code, type:
 
 ```
-/codemap:codemap-scan
+/codemap:scan
 ```
 
 如果插件正确安装，该命令会触发代码扫描流程。
@@ -171,8 +171,8 @@ cd rust-cli && cargo test
 # 2. 提交并打 tag，CI 自动构建并发布 / Commit, tag, and let CI build & release
 cd ..
 git add .
-git commit -m "release: v0.2.1"
-git tag v0.2.1
+git commit -m "release: v0.2.2"
+git tag v0.2.2
 git push origin main --tags
 # GitHub Actions 会自动为所有平台构建并创建 Release
 # GitHub Actions will automatically build for all platforms and create a Release
@@ -190,11 +190,11 @@ CodeMap/
 │   ├── .claude-plugin/
 │   │   └── plugin.json         #   插件清单 / Plugin manifest
 │   ├── commands/               #   斜杠命令 / Slash commands
-│   │   ├── scan.md             #     /codemap:codemap-scan
-│   │   ├── load.md             #     /codemap:codemap-load
-│   │   ├── update.md           #     /codemap:codemap-update
-│   │   ├── query.md            #     /codemap:codemap-query
-│   │   └── impact.md           #     /codemap:codemap-impact
+│   │   ├── scan.md             #     /codemap:scan
+│   │   ├── load.md             #     /codemap:load
+│   │   ├── update.md           #     /codemap:update
+│   │   ├── query.md            #     /codemap:query
+│   │   └── impact.md           #     /codemap:impact
 │   ├── skills/                 #   自动触发 Skill / Auto-triggering skill
 │   │   └── codemap/SKILL.md    #     统一入口，智能路由 / Unified entry, smart routing
 │   ├── hooks/                  #   事件钩子 / Event hooks
@@ -281,21 +281,21 @@ The `codemap` skill auto-activates based on conversation context and intelligent
 
 | 命令 / Command | 描述 / Description |
 |-------|------------|
-| `/codemap:codemap-scan` | 全量扫描项目，生成 .codemap/ 图谱 / Full scan, generate .codemap/ graph |
-| `/codemap:codemap-load [target]` | 加载图谱到上下文（概览/模块/文件）/ Load graph into context |
-| `/codemap:codemap-update` | 增量更新图谱 / Incremental update |
-| `/codemap:codemap-query <symbol>` | 查询符号定义和调用关系 / Query symbol definitions and call relations |
-| `/codemap:codemap-impact <target>` | 分析变更影响范围 / Analyze change impact |
+| `/codemap:scan` | 全量扫描项目，生成 .codemap/ 图谱 / Full scan, generate .codemap/ graph |
+| `/codemap:load [target]` | 加载图谱到上下文（概览/模块/文件）/ Load graph into context |
+| `/codemap:update` | 增量更新图谱 / Incremental update |
+| `/codemap:query <symbol>` | 查询符号定义和调用关系 / Query symbol definitions and call relations |
+| `/codemap:impact <target>` | 分析变更影响范围 / Analyze change impact |
 
 ### 典型工作流 / Typical Workflow
 
 ```
-1. 首次使用 / First time:     /codemap:codemap-scan       → 生成 .codemap/ 图谱
+1. 首次使用 / First time:     /codemap:scan       → 生成 .codemap/ 图谱
 2. 新会话开始 / New session:   (自动检测 / auto-detected)  → SessionStart hook 提示加载
-3. 加载概览 / Load overview:   /codemap:codemap-load       → 加载概览 (~500 tokens)
-4. 深入模块 / Dive into module: /codemap:codemap-load auth → 加载 auth 模块 (~2-5k tokens)
-5. 代码修改后 / After changes: /codemap:codemap-update     → 增量更新图谱
-6. 重构前 / Before refactor:   /codemap:codemap-impact auth → 查看影响范围
+3. 加载概览 / Load overview:   /codemap:load       → 加载概览 (~500 tokens)
+4. 深入模块 / Dive into module: /codemap:load auth → 加载 auth 模块 (~2-5k tokens)
+5. 代码修改后 / After changes: /codemap:update     → 增量更新图谱
+6. 重构前 / Before refactor:   /codemap:impact auth → 查看影响范围
 ```
 
 ---

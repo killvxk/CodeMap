@@ -1,5 +1,5 @@
 ---
-name: codemap-scan
+name: scan
 description: 全量扫描项目代码，生成 AST 结构化图谱到 .codemap/ 目录
 arguments:
   - name: dir
@@ -19,7 +19,7 @@ arguments:
 ls .codemap/graph.json 2>/dev/null && echo "CODEMAP_EXISTS" || echo "NO_CODEMAP"
 ```
 
-- 如果已存在，提醒用户图谱已存在，建议使用 `/codemap:codemap-update` 增量更新。如果用户确认要重新全量扫描，继续执行。
+- 如果已存在，提醒用户图谱已存在，建议使用 `/codemap:update` 增量更新。如果用户确认要重新全量扫描，继续执行。
 - 如果不存在，继续执行。
 
 ### 2. 执行全量扫描
@@ -37,7 +37,7 @@ ls .codemap/graph.json 2>/dev/null && echo "CODEMAP_EXISTS" || echo "NO_CODEMAP"
 
 ### 4. 提示后续操作
 
-- `/codemap:codemap-load` — 加载项目概览到上下文
-- `/codemap:codemap-load <模块名>` — 加载特定模块详细图谱
-- `/codemap:codemap-query <符号名>` — 查询函数/类的定义和调用关系
-- 图谱已持久化，下次会话只需 `/codemap:codemap-load` 即可恢复上下文
+- `/codemap:load` — 加载项目概览到上下文
+- `/codemap:load <模块名>` — 加载特定模块详细图谱
+- `/codemap:query <符号名>` — 查询函数/类的定义和调用关系
+- 图谱已持久化，下次会话只需 `/codemap:load` 即可恢复上下文

@@ -1,3 +1,5 @@
+# Dead了，用gitNexus吧，本项目宣布不再维护
+
 # CodeMap
 
 基于 AST 的代码图谱映射插件，适用于 [Claude Code](https://docs.anthropic.com/en/docs/claude-code)。扫描代码库一次，持久化结构图谱，后续会话加载紧凑切片即可恢复上下文——相比重新读取全部源码，节省约 95% token。

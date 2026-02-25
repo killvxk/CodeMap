@@ -32,24 +32,41 @@ git clone https://github.com/killvxk/CodeMap.git
 cd CodeMap
 ```
 
-#### 2. 验证 CLI 可用 / Verify CLI works
+#### 2. 二进制引擎 / Binary Engine
 
-预编译二进制已包含在 `ccplugin/bin/` 目录中，无需额外安装依赖：
+插件首次执行命令时会**自动从 GitHub Releases 下载**对应平台的二进制到 `~/.codemap/bin/`，无需手动操作。
 
-The pre-compiled binary is included in `ccplugin/bin/` — no additional dependencies required:
+The plugin **automatically downloads** the platform-specific binary from GitHub Releases to `~/.codemap/bin/` on first command execution. No manual steps required.
+
+你也可以提前手动安装（二进制查找优先级从高到低）：
+
+You can also install manually. Binary lookup order (highest to lowest priority):
+
+| 优先级 / Priority | 位置 / Location | 说明 / Description |
+|---|---|---|
+| 1 | `PATH` | 全局安装 / Globally installed |
+| 2 | `~/.codemap/bin/` | 用户级专用目录（推荐）/ User-level dedicated directory (recommended) |
+| 3 | `ccplugin/bin/` | 插件目录（向后兼容）/ Plugin directory (backward compatible) |
+| 4 | `rust-cli/target/release/` | 本地开发构建 / Local dev build |
+| 5 | 自动下载 / Auto-download | 从 GitHub Releases 下载到 `~/.codemap/bin/` |
 
 ```bash
-# Linux / macOS
-ccplugin/bin/codegraph-linux --version    # Linux x64
-ccplugin/bin/codegraph-macos --version    # macOS (Intel/Apple Silicon)
+# 手动安装示例 / Manual install example
+mkdir -p ~/.codemap/bin
+# Linux x64
+curl -fSL -o ~/.codemap/bin/codegraph-x86_64-linux \
+  https://github.com/killvxk/CodeMap/releases/latest/download/codegraph-x86_64-linux
+chmod +x ~/.codemap/bin/codegraph-x86_64-linux
 
-# Windows (Git Bash / PowerShell)
-ccplugin/bin/codegraph-windows.exe --version
+# macOS Apple Silicon
+curl -fSL -o ~/.codemap/bin/codegraph-aarch64-macos \
+  https://github.com/killvxk/CodeMap/releases/latest/download/codegraph-aarch64-macos
+chmod +x ~/.codemap/bin/codegraph-aarch64-macos
 ```
 
-> 如果 `ccplugin/bin/` 中没有适合你平台的二进制，可以从 [GitHub Releases](https://github.com/killvxk/CodeMap/releases) 下载，或参考下方"从源码构建"说明。
+> 支持通过环境变量 `CODEMAP_HOME` 自定义目录（默认 `~/.codemap`）。
 >
-> If no binary matches your platform in `ccplugin/bin/`, download from [GitHub Releases](https://github.com/killvxk/CodeMap/releases) or see "Build from Source" below.
+> Customize the directory via `CODEMAP_HOME` env var (default `~/.codemap`).
 
 #### 3. 安装为 Claude Code 插件 / Install as Claude Code plugin
 
@@ -99,23 +116,27 @@ If the plugin is installed correctly, this command will trigger the code scan wo
 
 ### 方式二：下载预编译二进制 / Download Pre-compiled Binary
 
-从 [GitHub Releases](https://github.com/killvxk/CodeMap/releases) 下载适合你平台的二进制文件：
+从 [GitHub Releases](https://github.com/killvxk/CodeMap/releases) 下载适合你平台的二进制文件，放到 `~/.codemap/bin/` 或 PATH 中：
 
-Download the binary for your platform from [GitHub Releases](https://github.com/killvxk/CodeMap/releases):
+Download the binary for your platform from [GitHub Releases](https://github.com/killvxk/CodeMap/releases) and place it in `~/.codemap/bin/` or anywhere in your PATH:
 
 ```bash
 # Linux x64
-curl -L https://github.com/killvxk/CodeMap/releases/latest/download/codegraph-linux -o codegraph
-chmod +x codegraph
-sudo mv codegraph /usr/local/bin/
+mkdir -p ~/.codemap/bin
+curl -fSL -o ~/.codemap/bin/codegraph-x86_64-linux \
+  https://github.com/killvxk/CodeMap/releases/latest/download/codegraph-x86_64-linux
+chmod +x ~/.codemap/bin/codegraph-x86_64-linux
 
-# macOS (Intel / Apple Silicon — 通用二进制)
-curl -L https://github.com/killvxk/CodeMap/releases/latest/download/codegraph-macos -o codegraph
-chmod +x codegraph
-sudo mv codegraph /usr/local/bin/
+# macOS (Apple Silicon)
+mkdir -p ~/.codemap/bin
+curl -fSL -o ~/.codemap/bin/codegraph-aarch64-macos \
+  https://github.com/killvxk/CodeMap/releases/latest/download/codegraph-aarch64-macos
+chmod +x ~/.codemap/bin/codegraph-aarch64-macos
 
 # Windows (PowerShell)
-Invoke-WebRequest -Uri https://github.com/killvxk/CodeMap/releases/latest/download/codegraph-windows.exe -OutFile codegraph.exe
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.codemap\bin"
+Invoke-WebRequest -Uri https://github.com/killvxk/CodeMap/releases/latest/download/codegraph-x86_64-windows.exe `
+  -OutFile "$env:USERPROFILE\.codemap\bin\codegraph-x86_64-windows.exe"
 ```
 
 安装后可以直接使用 `codegraph` 命令：
@@ -147,25 +168,14 @@ cargo build --release
 # 1. 确保测试通过 / Ensure tests pass
 cd rust-cli && cargo test
 
-# 2. 交叉编译所有平台 / Cross-compile for all platforms
-cargo build --release --target x86_64-unknown-linux-gnu
-cargo build --release --target aarch64-apple-darwin
-cargo build --release --target x86_64-pc-windows-gnu
-
-# 3. 提交并打 tag / Commit and tag
+# 2. 提交并打 tag，CI 自动构建并发布 / Commit, tag, and let CI build & release
 cd ..
 git add .
-git commit -m "release: v0.2.0"
-git tag v0.2.0
+git commit -m "release: v0.2.1"
+git tag v0.2.1
 git push origin main --tags
-
-# 4. 在 GitHub 创建 Release，上传二进制 / Create GitHub Release and upload binaries
-gh release create v0.2.0 \
-  ccplugin/bin/codegraph-linux \
-  ccplugin/bin/codegraph-macos \
-  ccplugin/bin/codegraph-windows.exe \
-  --title "CodeMap v0.2.0" \
-  --generate-notes
+# GitHub Actions 会自动为所有平台构建并创建 Release
+# GitHub Actions will automatically build for all platforms and create a Release
 ```
 
 ---
@@ -191,10 +201,9 @@ CodeMap/
 │   │   ├── hooks.json          #     SessionStart 自动检测
 │   │   └── scripts/
 │   │       └── detect-codemap.sh
-│   └── bin/                    #   预编译二进制 / Pre-compiled binaries
-│       ├── codegraph-linux     #     Linux x64
-│       ├── codegraph-macos     #     macOS (Intel + Apple Silicon)
-│       └── codegraph-windows.exe #   Windows x64
+│   └── bin/                    #   二进制 wrapper / Binary wrappers
+│       ├── codegraph           #     Unix wrapper (自动发现/下载二进制)
+│       └── codegraph.cmd       #     Windows wrapper
 ├── rust-cli/                   # Rust CLI 源码 / Rust CLI source
 │   ├── Cargo.toml
 │   ├── src/

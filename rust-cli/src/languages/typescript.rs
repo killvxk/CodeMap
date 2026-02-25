@@ -8,6 +8,12 @@ pub struct TypeScriptAdapter {
     tsx: bool,
 }
 
+impl Default for TypeScriptAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TypeScriptAdapter {
     pub fn new() -> Self {
         Self { tsx: false }

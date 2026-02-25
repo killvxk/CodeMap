@@ -6,6 +6,12 @@ use super::{
 
 pub struct PythonAdapter;
 
+impl Default for PythonAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PythonAdapter {
     pub fn new() -> Self {
         Self

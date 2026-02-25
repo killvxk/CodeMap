@@ -6,6 +6,12 @@ use super::{
 
 pub struct JavaAdapter;
 
+impl Default for JavaAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl JavaAdapter {
     pub fn new() -> Self {
         Self

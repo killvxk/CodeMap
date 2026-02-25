@@ -1,45 +1,69 @@
 #!/usr/bin/env bash
 # detect-codemap.sh — SessionStart hook
-# 检测当前工作目录是否有 .codemap/ 图谱，并检测可用的 codegraph 二进制
-# 兼容 Linux / macOS / Windows Git Bash
+# 检测 codegraph 二进制和 .codemap/ 图谱状态
+# 查找优先级: PATH > ~/.codemap/bin/ > 插件目录 > 开发构建
 
-# ── 检测 codegraph 二进制 ─────────────────────────────────────────────────────
+# ── 平台检测 ──────────────────────────────────────────────────────────────────
+
+case "$(uname -s 2>/dev/null)" in
+  Linux*)   _OS="linux" ;;
+  Darwin*)  _OS="macos" ;;
+  MINGW*|MSYS*|CYGWIN*) _OS="windows" ;;
+  *)        _OS="" ;;
+esac
+
+case "$(uname -m 2>/dev/null)" in
+  x86_64|amd64)  _ARCH="x86_64" ;;
+  aarch64|arm64) _ARCH="aarch64" ;;
+  *)             _ARCH="" ;;
+esac
+
+_BIN_NAME=""
+if [ -n "$_OS" ] && [ -n "$_ARCH" ]; then
+  _BIN_NAME="codegraph-${_ARCH}-${_OS}"
+  [ "$_OS" = "windows" ] && _BIN_NAME="${_BIN_NAME}.exe"
+fi
+
+CODEMAP_HOME="${CODEMAP_HOME:-$HOME/.codemap}"
+CODEMAP_BIN_DIR="${CODEMAP_HOME}/bin"
+
+# ── 多级查找 codegraph 二进制 ─────────────────────────────────────────────────
 
 CODEGRAPH_BIN=""
 
-# 1. 优先使用 PATH 中的 codegraph
+# 1. PATH 中的 codegraph（用户全局安装）
 if command -v codegraph >/dev/null 2>&1; then
   CODEGRAPH_BIN="codegraph"
 fi
 
-# 2. 检查插件目录下的预编译二进制（ccplugin/bin/codegraph-*）
-if [ -z "$CODEGRAPH_BIN" ] && [ -n "$CLAUDE_PLUGIN_ROOT" ]; then
-  # 按平台选择二进制名称
-  case "$(uname -s 2>/dev/null)" in
-    Linux*)   _PLATFORM="linux" ;;
-    Darwin*)  _PLATFORM="macos" ;;
-    MINGW*|MSYS*|CYGWIN*) _PLATFORM="windows" ;;
-    *)        _PLATFORM="" ;;
-  esac
-
-  if [ -n "$_PLATFORM" ]; then
-    _BIN_PATH="$CLAUDE_PLUGIN_ROOT/bin/codegraph-$_PLATFORM"
-    # Windows 下尝试 .exe 后缀
-    if [ "$_PLATFORM" = "windows" ] && [ -f "${_BIN_PATH}.exe" ]; then
-      CODEGRAPH_BIN="${_BIN_PATH}.exe"
-    elif [ -f "$_BIN_PATH" ]; then
-      CODEGRAPH_BIN="$_BIN_PATH"
-    fi
+# 1b. PATH 中的 arch-specific 名称
+if [ -z "$CODEGRAPH_BIN" ] && [ -n "$_BIN_NAME" ]; then
+  if command -v "$_BIN_NAME" >/dev/null 2>&1; then
+    CODEGRAPH_BIN="$(command -v "$_BIN_NAME")"
   fi
 fi
 
-# 3. 检查 rust-cli 本地构建产物（开发环境）
+# 2. ~/.codemap/bin/（用户级专用目录）
+if [ -z "$CODEGRAPH_BIN" ] && [ -n "$_BIN_NAME" ] && [ -f "${CODEMAP_BIN_DIR}/${_BIN_NAME}" ]; then
+  CODEGRAPH_BIN="${CODEMAP_BIN_DIR}/${_BIN_NAME}"
+fi
+
+# 3. 插件目录（向后兼容）
+if [ -z "$CODEGRAPH_BIN" ] && [ -n "$CLAUDE_PLUGIN_ROOT" ] && [ -n "$_BIN_NAME" ]; then
+  if [ -f "$CLAUDE_PLUGIN_ROOT/bin/${_BIN_NAME}" ]; then
+    CODEGRAPH_BIN="$CLAUDE_PLUGIN_ROOT/bin/${_BIN_NAME}"
+  fi
+fi
+
+# 4. 开发构建 (rust-cli/target/)
 if [ -z "$CODEGRAPH_BIN" ]; then
+  _DEV_NAME="codegraph"
+  [ "$_OS" = "windows" ] && _DEV_NAME="codegraph.exe"
   for _CANDIDATE in \
-    "./rust-cli/target/release/codegraph" \
-    "./rust-cli/target/release/codegraph.exe" \
-    "./rust-cli/target/debug/codegraph" \
-    "./rust-cli/target/debug/codegraph.exe"
+    "./rust-cli/target/release/${_DEV_NAME}" \
+    "./rust-cli/target/release/${_DEV_NAME}" \
+    "./rust-cli/target/debug/${_DEV_NAME}" \
+    "./rust-cli/target/debug/${_DEV_NAME}"
   do
     if [ -f "$_CANDIDATE" ]; then
       CODEGRAPH_BIN="$_CANDIDATE"
@@ -61,5 +85,6 @@ fi
 if [ -n "$CODEGRAPH_BIN" ]; then
   echo "[CodeMap] codegraph 引擎：$CODEGRAPH_BIN"
 else
-  echo "[CodeMap] 未找到 codegraph 二进制。请从 https://github.com/killvxk/CodeMap/releases 下载，或执行 cd rust-cli && cargo build --release 构建。"
+  echo "[CodeMap] 未找到 codegraph 二进制。首次执行命令时将自动从 GitHub Releases 下载，"
+  echo "[CodeMap] 或手动放置到: ~/.codemap/bin/${_BIN_NAME}"
 fi

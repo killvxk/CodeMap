@@ -112,7 +112,10 @@ pub fn run(args: UpdateArgs) {
         let adapter = crate::languages::get_adapter(lang);
 
         let mut ts_parser = tree_sitter::Parser::new();
-        ts_parser.set_language(&adapter.language()).ok();
+        if ts_parser.set_language(&adapter.language()).is_err() {
+            eprintln!("Warning: failed to set language for {:?}, skipping", abs_path);
+            continue;
+        }
         let tree = match ts_parser.parse(content, None) {
             Some(t) => t,
             None => continue,

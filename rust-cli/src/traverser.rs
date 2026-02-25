@@ -62,7 +62,7 @@ pub fn has_cpp_source_files(files: &[PathBuf]) -> bool {
     files.iter().any(|f| {
         f.extension()
             .and_then(|e| e.to_str())
-            .map(|e| matches!(e.to_lowercase().as_str(), "cpp" | "cc" | "cxx" | "hpp" | "hh"))
+            .map(|e| matches!(e.to_lowercase().as_str(), "cpp" | "cc" | "cxx"))
             .unwrap_or(false)
     })
 }

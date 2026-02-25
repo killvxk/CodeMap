@@ -6,7 +6,6 @@ mod grammar_tests;
 mod graph;
 pub mod impact;
 pub mod languages;
-mod parser;
 mod path_utils;
 pub mod query;
 mod scanner;

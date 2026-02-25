@@ -236,7 +236,9 @@ pub fn save_slices(output_dir: &Path, graph: &CodeGraph) -> anyhow::Result<()> {
     let slices = generate_slices(graph);
     for (mod_name, slice) in &slices {
         let slice_json = serde_json::to_string_pretty(slice)?;
-        std::fs::write(slices_dir.join(format!("{}.json", mod_name)), slice_json)?;
+        // 净化模块名，防止路径穿越
+        let safe_name = mod_name.replace(['/', '\\', '.'], "_");
+        std::fs::write(slices_dir.join(format!("{}.json", safe_name)), slice_json)?;
     }
 
     Ok(())

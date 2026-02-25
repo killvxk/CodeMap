@@ -8,6 +8,9 @@ docs/impl-notes/
 *.log
 *.tgz
 .DS_Store
+.claude/
+docs/plan/
+.codemap-rust-backup/
 
 # Rust 构建产物
 rust-cli/target/

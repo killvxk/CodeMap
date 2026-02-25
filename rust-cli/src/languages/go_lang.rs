@@ -6,6 +6,12 @@ use super::{
 
 pub struct GoAdapter;
 
+impl Default for GoAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GoAdapter {
     pub fn new() -> Self {
         Self
@@ -85,7 +91,7 @@ impl LanguageAdapter for GoAdapter {
             let symbol = if let Some(alias) = alias_node {
                 node_text(alias, source).to_string()
             } else {
-                src.split('/').last().unwrap_or(&src).to_string()
+                src.split('/').next_back().unwrap_or(&src).to_string()
             };
             imports.push(ImportInfo {
                 source: src,

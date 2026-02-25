@@ -97,10 +97,11 @@ pub fn merge_graph_update(
             depended_by: vec![],
         });
 
-        // 将文件加入模块（避免重复）
+        // 将文件加入模块（避免重复，用 HashSet 检查）
         let mod_name = file_data.module.clone();
         let module = graph.modules.get_mut(&mod_name).unwrap();
-        if !module.files.contains(&file_path) {
+        let file_set: HashSet<&String> = module.files.iter().collect();
+        if !file_set.contains(&file_path) {
             module.files.push(file_path.clone());
         }
 

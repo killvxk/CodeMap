@@ -75,25 +75,26 @@ pub fn get_adapter(lang: crate::traverser::Language) -> Box<dyn LanguageAdapter>
 // 共享辅助函数
 // ---------------------------------------------------------------------------
 
-/// 深度优先遍历所有节点，对每个节点调用 visitor
-/// 注意：使用递归实现，极端深层嵌套（>1000层）可能导致栈溢出
-pub fn walk_nodes<F>(node: tree_sitter::Node, visitor: &mut F)
+/// 深度优先遍历所有节点，对每个节点调用 visitor（迭代实现，避免栈溢出）
+pub fn walk_nodes<F>(root: tree_sitter::Node, visitor: &mut F)
 where
     F: FnMut(tree_sitter::Node),
 {
-    visitor(node);
-    let mut cursor = node.walk();
-    if cursor.goto_first_child() {
-        loop {
-            walk_nodes(cursor.node(), visitor);
-            if !cursor.goto_next_sibling() {
-                break;
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        visitor(node);
+        // 反向压栈以保持子节点的原始顺序
+        let count = node.child_count();
+        for i in (0..count).rev() {
+            if let Some(child) = node.child(i) {
+                stack.push(child);
             }
         }
     }
 }
 
 /// 查找第一个指定类型的直接子节点
+#[allow(clippy::manual_find)]
 pub fn find_child_of_type<'a>(node: tree_sitter::Node<'a>, kind: &str) -> Option<tree_sitter::Node<'a>> {
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {

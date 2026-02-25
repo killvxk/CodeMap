@@ -27,7 +27,11 @@ pub fn posix_normalize(path: &str) -> String {
         match seg {
             "" | "." => {}
             ".." => {
-                parts.pop();
+                if parts.is_empty() {
+                    parts.push("..");
+                } else {
+                    parts.pop();
+                }
             }
             s => parts.push(s),
         }

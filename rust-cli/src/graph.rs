@@ -247,7 +247,8 @@ fn unix_to_datetime(secs: u64) -> (u64, u64, u64, u64, u64, u64) {
     // 从 1970-01-01 计算年月日
     let mut year = 1970u64;
     let mut days = total_days;
-    loop {
+    // 上界保护：避免异常时间戳导致死循环（年份上限 9999）
+    while year < 10000 {
         let days_in_year = if is_leap(year) { 366 } else { 365 };
         if days < days_in_year {
             break;
@@ -268,7 +269,7 @@ fn unix_to_datetime(secs: u64) -> (u64, u64, u64, u64, u64, u64) {
 }
 
 fn is_leap(year: u64) -> bool {
-    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+    (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
 }
 
 // ── 测试 ──────────────────────────────────────────────────────────────────────

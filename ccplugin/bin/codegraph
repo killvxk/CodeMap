@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# codegraph — platform-detecting wrapper
-# 根据当前 OS 和 CPU 架构选择正确的预编译二进制并执行
+# codegraph — platform-detecting wrapper with multi-level binary discovery
+# 查找优先级: PATH > ~/.codemap/bin/ > 插件目录 > 开发构建 > 自动下载
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# ── 平台检测 ──────────────────────────────────────────────────────────────────
 
-# 检测 OS
 case "$(uname -s 2>/dev/null)" in
   Linux*)   _OS="linux" ;;
   Darwin*)  _OS="macos" ;;
@@ -17,7 +16,6 @@ case "$(uname -s 2>/dev/null)" in
     ;;
 esac
 
-# 检测 CPU 架构
 case "$(uname -m 2>/dev/null)" in
   x86_64|amd64)  _ARCH="x86_64" ;;
   aarch64|arm64) _ARCH="aarch64" ;;
@@ -27,19 +25,84 @@ case "$(uname -m 2>/dev/null)" in
     ;;
 esac
 
-# 构造二进制路径
 _BIN_NAME="codegraph-${_ARCH}-${_OS}"
 if [ "$_OS" = "windows" ]; then
   _BIN_NAME="${_BIN_NAME}.exe"
 fi
 
-_BIN_PATH="${SCRIPT_DIR}/${_BIN_NAME}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CODEMAP_HOME="${CODEMAP_HOME:-$HOME/.codemap}"
+CODEMAP_BIN_DIR="${CODEMAP_HOME}/bin"
+GITHUB_REPO="killvxk/CodeMap"
 
-if [ ! -f "$_BIN_PATH" ]; then
-  echo "[CodeMap] Binary not found: ${_BIN_PATH}" >&2
-  echo "[CodeMap] Please download the release binary for ${_ARCH}-${_OS} from:" >&2
-  echo "[CodeMap]   https://github.com/killvxk/CodeMap/releases" >&2
-  exit 1
+# ── 多级查找 ──────────────────────────────────────────────────────────────────
+
+_BIN=""
+
+# 1. PATH 中的 arch-specific 二进制
+if command -v "$_BIN_NAME" >/dev/null 2>&1; then
+  _BIN="$(command -v "$_BIN_NAME")"
 fi
 
-exec "$_BIN_PATH" "$@"
+# 2. ~/.codemap/bin/
+if [ -z "$_BIN" ] && [ -f "${CODEMAP_BIN_DIR}/${_BIN_NAME}" ]; then
+  _BIN="${CODEMAP_BIN_DIR}/${_BIN_NAME}"
+fi
+
+# 3. 插件目录 (向后兼容)
+if [ -z "$_BIN" ] && [ -f "${SCRIPT_DIR}/${_BIN_NAME}" ]; then
+  _BIN="${SCRIPT_DIR}/${_BIN_NAME}"
+fi
+
+# 4. 开发构建 (rust-cli/target/)
+if [ -z "$_BIN" ]; then
+  _DEV_NAME="codegraph"
+  [ "$_OS" = "windows" ] && _DEV_NAME="codegraph.exe"
+  for _CANDIDATE in \
+    "${SCRIPT_DIR}/../../rust-cli/target/release/${_DEV_NAME}" \
+    "${SCRIPT_DIR}/../../rust-cli/target/debug/${_DEV_NAME}" \
+    "./rust-cli/target/release/${_DEV_NAME}" \
+    "./rust-cli/target/debug/${_DEV_NAME}"
+  do
+    if [ -f "$_CANDIDATE" ]; then
+      _BIN="$_CANDIDATE"
+      break
+    fi
+  done
+fi
+
+# 5. 自动下载
+if [ -z "$_BIN" ]; then
+  echo "[CodeMap] 未找到 codegraph 二进制 (${_BIN_NAME})，正在从 GitHub Releases 下载..." >&2
+
+  # 获取最新 release 的下载 URL
+  _DOWNLOAD_URL="https://github.com/${GITHUB_REPO}/releases/latest/download/${_BIN_NAME}"
+
+  mkdir -p "$CODEMAP_BIN_DIR"
+  _TARGET="${CODEMAP_BIN_DIR}/${_BIN_NAME}"
+
+  if command -v curl >/dev/null 2>&1; then
+    curl -fSL --progress-bar -o "$_TARGET" "$_DOWNLOAD_URL"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q --show-progress -O "$_TARGET" "$_DOWNLOAD_URL"
+  else
+    echo "[CodeMap] 下载失败：未找到 curl 或 wget" >&2
+    echo "[CodeMap] 请手动下载: ${_DOWNLOAD_URL}" >&2
+    echo "[CodeMap] 放置到以下任一位置:" >&2
+    echo "[CodeMap]   1. ~/.codemap/bin/${_BIN_NAME}" >&2
+    echo "[CodeMap]   2. PATH 中的任意目录" >&2
+    exit 1
+  fi
+
+  if [ $? -ne 0 ] || [ ! -f "$_TARGET" ]; then
+    echo "[CodeMap] 下载失败，请手动下载: ${_DOWNLOAD_URL}" >&2
+    rm -f "$_TARGET"
+    exit 1
+  fi
+
+  chmod +x "$_TARGET"
+  echo "[CodeMap] 已下载到 ${_TARGET}" >&2
+  _BIN="$_TARGET"
+fi
+
+exec "$_BIN" "$@"

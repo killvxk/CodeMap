@@ -7,6 +7,12 @@ use super::c_lang::{extract_c_includes, extract_c_functions, extract_c_exports, 
 
 pub struct CppAdapter;
 
+impl Default for CppAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CppAdapter {
     pub fn new() -> Self {
         Self

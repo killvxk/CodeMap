@@ -7,6 +7,12 @@ use super::{
 /// JavaScript 适配器（复用 TypeScript 逻辑，使用 JS grammar）
 pub struct JavaScriptAdapter;
 
+impl Default for JavaScriptAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl JavaScriptAdapter {
     pub fn new() -> Self {
         Self

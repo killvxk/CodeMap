@@ -39,10 +39,11 @@ pub fn convert_classes(lang_classes: &[languages::ClassInfo]) -> Vec<GraphClassI
         }).collect()
 }
 
-pub fn convert_types(lang_classes: &[languages::ClassInfo], lang: Language) -> Vec<GraphTypeInfo> {
+pub fn convert_types(lang_classes: &[languages::ClassInfo], _lang: Language) -> Vec<GraphTypeInfo> {
     lang_classes.iter()
         .filter(|c| {
-            !(lang == Language::Python && c.kind.as_str() == "class")
+            // 只有非 class/struct 的类型进入 types（class/struct 已在 convert_classes 中处理）
+            !matches!(c.kind.as_str(), "class" | "struct")
         })
         .map(|c| GraphTypeInfo {
             name: c.name.clone(),
@@ -92,14 +93,15 @@ pub fn detect_module_name(file_path: &Path, root_dir: &Path) -> String {
     }
 
     // 跳过开头的 COMMON_ROOT_DIRS
-    while !segments.is_empty() && COMMON_ROOT_DIRS.contains(&segments[0].as_str()) {
-        segments.remove(0);
+    let mut skip = 0;
+    while skip < segments.len() && COMMON_ROOT_DIRS.contains(&segments[skip].as_str()) {
+        skip += 1;
     }
 
-    if segments.is_empty() {
+    if skip >= segments.len() {
         "_root".to_string()
     } else {
-        segments[0].clone()
+        segments[skip].clone()
     }
 }
 
@@ -154,7 +156,10 @@ pub fn scan_project(root_dir: &Path, exclude: &[String]) -> anyhow::Result<CodeG
 
         // 用语言适配器解析
         let mut ts_parser = tree_sitter::Parser::new();
-        ts_parser.set_language(&adapter.language()).ok();
+        if ts_parser.set_language(&adapter.language()).is_err() {
+            eprintln!("Warning: failed to set language for {:?}, skipping", abs_path);
+            continue;
+        }
         let tree = match ts_parser.parse(&content, None) {
             Some(t) => t,
             None => continue,
@@ -476,14 +481,15 @@ mod tests {
                 kind: "enum".to_string(),
             },
         ];
-        // Python: class 不进入 types
+        // class/struct 不进入 types（所有语言统一）
         let types_py = convert_types(&lang_classes, Language::Python);
         assert_eq!(types_py.len(), 1);
         assert_eq!(types_py[0].name, "MyEnum");
 
-        // TypeScript: class 进入 types
+        // TypeScript 同样：class 不进入 types
         let types_ts = convert_types(&lang_classes, Language::TypeScript);
-        assert_eq!(types_ts.len(), 2);
+        assert_eq!(types_ts.len(), 1);
+        assert_eq!(types_ts[0].name, "MyEnum");
     }
 
     #[test]

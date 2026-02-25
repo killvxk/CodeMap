@@ -6,6 +6,12 @@ use super::{
 
 pub struct CAdapter;
 
+impl Default for CAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CAdapter {
     pub fn new() -> Self {
         Self

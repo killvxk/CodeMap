@@ -1,4 +1,6 @@
-# Dead了，用gitNexus吧，本项目宣布不再维护
+# Dead了，用gitNexus吧，本项目宣布不再维护（虽然我觉得我的skill+rust cli更节约，但是奈何别人项目用起来也很舒服）
+
+# 在这里转向 https://github.com/abhigyanpatwari/GitNexus
 
 # CodeMap
 

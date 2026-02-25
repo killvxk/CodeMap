@@ -1,5 +1,4 @@
 ---
-name: load
 description: 从 .codemap/ 加载代码图谱到当前会话上下文，支持加载概览、指定模块或文件
 arguments:
   - name: target

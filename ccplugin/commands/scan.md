@@ -1,5 +1,4 @@
 ---
-name: scan
 description: 全量扫描项目代码，生成 AST 结构化图谱到 .codemap/ 目录
 arguments:
   - name: dir

@@ -1,5 +1,4 @@
 ---
-name: update
 description: 增量更新代码图谱，只重新解析变更的文件
 ---
 

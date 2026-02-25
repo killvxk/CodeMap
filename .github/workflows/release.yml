@@ -23,9 +23,6 @@ jobs:
             os: ubuntu-22.04
             artifact: codegraph-aarch64-linux
             use_cross: true
-          - target: x86_64-apple-darwin
-            os: macos-13
-            artifact: codegraph-x86_64-macos
           - target: aarch64-apple-darwin
             os: macos-14
             artifact: codegraph-aarch64-macos

@@ -6,9 +6,10 @@ description: >
   before making code changes, when the user asks about functions/classes/modules,
   when planning refactoring, or when .codemap/ directory exists or needs to be created.
   Keywords: 代码图谱, 项目结构, 架构, 代码地图, 模块, 扫描, 索引, 加载, 查询,
-  影响分析, 重构, scan, load, query, impact, update, codemap, code graph,
+  影响分析, 重构, scan, load, query, impact, update, prompts, codemap, code graph,
   understand codebase, project overview, code structure, 了解代码, 开始工作,
-  查找函数, 哪里定义, 谁调用了, 影响范围, 依赖分析, 更新图谱, 刷新.
+  查找函数, 哪里定义, 谁调用了, 影响范围, 依赖分析, 更新图谱, 刷新,
+  CLAUDE.md, 使用规范, 注入规则.
 ---
 
 # CodeMap — 代码图谱智能路由
@@ -47,6 +48,7 @@ ls .codemap/graph.json 2>/dev/null && echo "CODEMAP_EXISTS" || echo "NO_CODEMAP"
 | 谈到重构、改动影响、风险评估 | 执行 `/codemap:impact <目标>` |
 | 说代码改了、图谱过期、要刷新 | 执行 `/codemap:update` |
 | 要重新全量扫描 | 执行 `/codemap:scan` |
+| 想把 codemap 规范写入 CLAUDE.md | 执行 `/codemap:prompts` |
 
 ### Step 4: 执行路由
 
@@ -61,3 +63,4 @@ ls .codemap/graph.json 2>/dev/null && echo "CODEMAP_EXISTS" || echo "NO_CODEMAP"
 | `/codemap:query <symbol>` | 查询符号定义和调用关系 |
 | `/codemap:update` | 增量更新图谱 |
 | `/codemap:impact <target>` | 分析变更影响范围 |
+| `/codemap:prompts` | 将 codemap 使用规范注入项目 CLAUDE.md |

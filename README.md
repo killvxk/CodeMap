@@ -193,7 +193,8 @@ CodeMap/
 │   │   ├── load.md             #     /codemap:load
 │   │   ├── update.md           #     /codemap:update
 │   │   ├── query.md            #     /codemap:query
-│   │   └── impact.md           #     /codemap:impact
+│   │   ├── impact.md           #     /codemap:impact
+│   │   └── prompts.md          #     /codemap:prompts
 │   ├── skills/                 #   自动触发 Skill / Auto-triggering skill
 │   │   └── codemap/SKILL.md    #     统一入口，智能路由 / Unified entry, smart routing
 │   ├── hooks/                  #   事件钩子 / Event hooks
@@ -285,6 +286,7 @@ The `codemap` skill auto-activates based on conversation context and intelligent
 | `/codemap:update` | 增量更新图谱 / Incremental update |
 | `/codemap:query <symbol>` | 查询符号定义和调用关系 / Query symbol definitions and call relations |
 | `/codemap:impact <target>` | 分析变更影响范围 / Analyze change impact |
+| `/codemap:prompts` | 将 codemap 使用规范注入项目 CLAUDE.md / Inject codemap usage rules into project CLAUDE.md |
 
 ### 典型工作流 / Typical Workflow
 
@@ -295,6 +297,7 @@ The `codemap` skill auto-activates based on conversation context and intelligent
 4. 深入模块 / Dive into module: /codemap:load auth → 加载 auth 模块 (~2-5k tokens)
 5. 代码修改后 / After changes: /codemap:update     → 增量更新图谱
 6. 重构前 / Before refactor:   /codemap:impact auth → 查看影响范围
+7. 注入规范 / Inject rules:    /codemap:prompts    → 写入使用规范到 CLAUDE.md
 ```
 
 ---

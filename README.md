@@ -349,3 +349,73 @@ cargo test
 ## 许可证 / License
 
 [MIT](LICENSE)
+
+---
+
+## 附录：CodeMap vs Grep vs LSP — Token 效率对比 / Appendix: Token Efficiency Comparison
+
+AI 编码助手理解代码结构时，不同工具的 token 消耗差异显著。以查询函数 `analyze_impact` 的定义和完整调用关系为例：
+
+When an AI coding assistant needs to understand code structure, different tools consume vastly different amounts of tokens. Using the function `analyze_impact` as an example:
+
+### 方式一：Grep + Read（传统方式 / Traditional Approach）
+
+| 步骤 / Step | 操作 / Operation | Token 消耗 / Tokens |
+|---|---|---|
+| 1 | `Grep "analyze_impact"` 全项目搜索 / Search entire project | ~300-500 |
+| 2 | `Read impact.rs` 查看定义（280 行）/ Read definition (280 lines) | ~1500-2000 |
+| 3 | `Read commands/impact.rs` 查看调用方 / Read caller | ~400-600 |
+| 4 | `Read tests/impact_compat.rs` 查看测试引用 / Read test references | ~800-1200 |
+| 5 | 可能还需额外 Grep 确认无遗漏 / Additional Grep to confirm coverage | ~300-500 |
+| **合计 / Total** | **4-5 次工具调用 / 4-5 tool calls** | **~3000-5000** |
+
+### 方式二：LSP（find-references）
+
+| 步骤 / Step | 操作 / Operation | Token 消耗 / Tokens |
+|---|---|---|
+| 1 | `find-references` 返回 11 个位置 / Returns 11 locations | ~200 |
+| 2 | `Read impact.rs` 理解引用上下文 / Read to understand context | ~1500 |
+| 3 | `Read commands/impact.rs` 理解引用上下文 / Read to understand context | ~500 |
+| 4 | `Read tests/impact_compat.rs` 理解引用上下文 / Read to understand context | ~800 |
+| **合计 / Total** | **3-4 次工具调用 / 3-4 tool calls** | **~3000** |
+
+> LSP 返回的是**裸位置**（file:line:column），AI agent 拿到位置后仍需 Read 文件才能理解每个引用是 import 还是函数调用。
+>
+> LSP returns **raw positions** (file:line:column). The AI agent still needs to Read each file to understand whether a reference is an import or a function call.
+
+### 方式三：CodeMap query
+
+| 步骤 / Step | 操作 / Operation | Token 消耗 / Tokens |
+|---|---|---|
+| 1 | `codegraph query analyze_impact` — 一次返回全部 / Single query returns everything | ~150-200 |
+| **合计 / Total** | **1 次工具调用 / 1 tool call** | **~150-200** |
+
+返回结果已预分类 / Results are pre-categorized:
+
+```
+[function] analyze_impact (rust-cli/src/impact.rs:35)
+  signature: analyze_impact(graph, target, max_depth)
+  module:    rust-cli
+  lines:     35-68
+  usedAt:                          ← 同文件调用 / Same-file calls
+    rust-cli/src/impact.rs :211 :228 :236 :245 :253 :261 :271 :278
+  importedBy:                      ← 跨文件引用 / Cross-file references
+    rust-cli/src/commands/impact.rs:5 (use :5 :37)
+    rust-cli/tests/impact_compat.rs:1 (use :1 :17 :24 :31 :42 ...)
+```
+
+### 对比总结 / Summary
+
+| | Grep + Read | LSP | CodeMap |
+|---|---|---|---|
+| Token 消耗 / Tokens | ~3000-5000 | ~3000 | ~150-200 |
+| 工具调用次数 / Tool calls | 4-5 | 3-4 | 1 |
+| 节省比例 / Savings | 基准 / Baseline | ~30% | **~95%** |
+| 需要 Read 文件 / Requires file reads | 是 / Yes | 是 / Yes | 否 / No |
+| 结果预分类 / Pre-categorized | 否 / No | 否 / No | 是 / Yes |
+| 需要运行服务 / Requires running service | 否 / No | 是 / Yes | 否 / No |
+| 跨语言统一 / Cross-language unified | 否 / No | 否 / No | 是 / Yes |
+
+> **核心差异 / Key Insight:** LSP 为人设计——人在 IDE 中点击引用即可跳转，用眼睛理解上下文，不消耗 token。CodeMap 为 AI agent 设计——返回预计算的结构化关系，agent 无需再 Read 文件即可理解调用链。
+>
+> LSP is designed for humans — click a reference in the IDE, jump to it, and understand context visually (zero tokens). CodeMap is designed for AI agents — returns pre-computed structural relationships so the agent understands call chains without reading files.

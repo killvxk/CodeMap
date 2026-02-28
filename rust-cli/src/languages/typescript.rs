@@ -1,6 +1,6 @@
 use tree_sitter::{Language, Tree};
 use super::{
-    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter,
+    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter, VariableInfo,
     find_child_of_type, node_text, strip_quotes, walk_nodes,
 };
 
@@ -118,6 +118,7 @@ impl LanguageAdapter for TypeScriptAdapter {
                 source: src,
                 names,
                 is_default: false,
+                line: node.start_position().row + 1,
             });
         });
         imports
@@ -213,6 +214,66 @@ impl LanguageAdapter for TypeScriptAdapter {
         });
         classes
     }
+
+    fn extract_variables(&self, tree: &Tree, source: &[u8]) -> Vec<VariableInfo> {
+        let mut variables = Vec::new();
+        let root = tree.root_node();
+        let mut cursor = root.walk();
+        for child in root.children(&mut cursor) {
+            // 直接顶层 lexical_declaration（const/let）
+            if child.kind() == "lexical_declaration" {
+                extract_ts_lexical_decl(child, source, false, &mut variables);
+            }
+            // export statement 包裹的 lexical_declaration
+            if child.kind() == "export_statement" {
+                if let Some(lex) = find_child_of_type(child, "lexical_declaration") {
+                    extract_ts_lexical_decl(lex, source, true, &mut variables);
+                }
+            }
+        }
+        variables
+    }
+}
+
+fn extract_ts_lexical_decl(
+    node: tree_sitter::Node,
+    source: &[u8],
+    is_exported: bool,
+    variables: &mut Vec<VariableInfo>,
+) {
+    // 确定 kind：const 或 let（通过节点文本匹配）
+    let kind = {
+        let mut c = node.walk();
+        let mut k = "let".to_string();
+        for child in node.children(&mut c) {
+            let t = node_text(child, source);
+            if t == "const" || t == "let" {
+                k = t.to_string();
+                break;
+            }
+        }
+        k
+    };
+    let mut c = node.walk();
+    for decl in node.children(&mut c) {
+        if decl.kind() != "variable_declarator" {
+            continue;
+        }
+        // 跳过箭头函数/函数（已由 extract_functions 处理）
+        if let Some(val) = decl.child_by_field_name("value") {
+            if val.kind() == "arrow_function" || val.kind() == "function" {
+                continue;
+            }
+        }
+        if let Some(name_node) = decl.child_by_field_name("name") {
+            variables.push(VariableInfo {
+                name: node_text(name_node, source).to_string(),
+                kind: kind.clone(),
+                start_line: node.start_position().row + 1,
+                is_exported,
+            });
+        }
+    }
 }
 
 fn parse_function_declaration(node: tree_sitter::Node, source: &[u8]) -> Option<FunctionInfo> {
@@ -235,7 +296,6 @@ fn parse_function_declaration(node: tree_sitter::Node, source: &[u8]) -> Option<
 
 fn extract_params_text(params_node: tree_sitter::Node, source: &[u8]) -> Vec<String> {
     let text = node_text(params_node, source);
-    // 简单提取参数名：去掉括号，按逗号分割
     let inner = text.trim_start_matches('(').trim_end_matches(')');
     if inner.trim().is_empty() {
         return Vec::new();
@@ -339,5 +399,23 @@ interface Runnable {}
         let animal = classes.iter().find(|c| c.name == "Animal").unwrap();
         assert!(animal.methods.contains(&"speak".to_string()));
         assert!(animal.methods.contains(&"move".to_string()));
+    }
+
+    #[test]
+    fn test_ts_extract_variables() {
+        let src = r#"
+const MAX = 100;
+let count = 0;
+export const API_URL = "https://example.com";
+export const handler = () => {};
+"#;
+        let tree = parse(src, false);
+        let adapter = TypeScriptAdapter::new();
+        let vars = adapter.extract_variables(&tree, src.as_bytes());
+        assert!(vars.iter().any(|v| v.name == "MAX" && v.kind == "const" && !v.is_exported));
+        assert!(vars.iter().any(|v| v.name == "count" && v.kind == "let" && !v.is_exported));
+        assert!(vars.iter().any(|v| v.name == "API_URL" && v.kind == "const" && v.is_exported));
+        // handler 是箭头函数，应被跳过
+        assert!(!vars.iter().any(|v| v.name == "handler"));
     }
 }

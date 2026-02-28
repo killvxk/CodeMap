@@ -5,7 +5,7 @@ use std::path::PathBuf;
 pub struct QueryArgs {
     /// Symbol or module name to query
     pub symbol: String,
-    /// Filter by type: function, class, or type
+    /// Filter by type: function, class, type, or variable
     #[arg(long)]
     pub r#type: Option<String>,
     /// Project directory

@@ -1,6 +1,6 @@
 use tree_sitter::{Language, Tree};
 use super::{
-    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter,
+    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter, VariableInfo,
     node_text, walk_nodes,
 };
 
@@ -64,6 +64,7 @@ impl LanguageAdapter for RustAdapter {
                 source: String::new(),
                 names: Vec::new(),
                 is_default: false,
+                line: node.start_position().row + 1,
             };
             parse_use_tree(node, source, &mut result);
             if !result.source.is_empty() {
@@ -142,6 +143,38 @@ impl LanguageAdapter for RustAdapter {
             }
         });
         classes
+    }
+
+    fn extract_variables(&self, tree: &Tree, source: &[u8]) -> Vec<VariableInfo> {
+        let mut variables = Vec::new();
+        let root = tree.root_node();
+        let mut cursor = root.walk();
+        for child in root.children(&mut cursor) {
+            match child.kind() {
+                "const_item" => {
+                    if let Some(name_node) = child.child_by_field_name("name") {
+                        variables.push(VariableInfo {
+                            name: node_text(name_node, source).to_string(),
+                            kind: "const".into(),
+                            start_line: child.start_position().row + 1,
+                            is_exported: has_pub_visibility(child, source),
+                        });
+                    }
+                }
+                "static_item" => {
+                    if let Some(name_node) = child.child_by_field_name("name") {
+                        variables.push(VariableInfo {
+                            name: node_text(name_node, source).to_string(),
+                            kind: "static".into(),
+                            start_line: child.start_position().row + 1,
+                            is_exported: has_pub_visibility(child, source),
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+        variables
     }
 }
 

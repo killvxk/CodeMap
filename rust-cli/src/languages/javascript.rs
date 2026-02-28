@@ -1,6 +1,6 @@
 use tree_sitter::{Language, Tree};
 use super::{
-    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter,
+    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter, VariableInfo,
     find_child_of_type, node_text, strip_quotes, walk_nodes,
 };
 
@@ -115,7 +115,7 @@ impl LanguageAdapter for JavaScriptAdapter {
                     }
                 }
             }
-            imports.push(ImportInfo { source: src, names, is_default: false });
+            imports.push(ImportInfo { source: src, names, is_default: false, line: node.start_position().row + 1 });
         });
         imports
     }
@@ -186,6 +186,62 @@ impl LanguageAdapter for JavaScriptAdapter {
             }
         });
         classes
+    }
+
+    fn extract_variables(&self, tree: &Tree, source: &[u8]) -> Vec<VariableInfo> {
+        let mut variables = Vec::new();
+        let root = tree.root_node();
+        let mut cursor = root.walk();
+        for child in root.children(&mut cursor) {
+            if child.kind() == "lexical_declaration" {
+                extract_js_lexical_decl(child, source, false, &mut variables);
+            }
+            if child.kind() == "export_statement" {
+                if let Some(lex) = find_child_of_type(child, "lexical_declaration") {
+                    extract_js_lexical_decl(lex, source, true, &mut variables);
+                }
+            }
+        }
+        variables
+    }
+}
+
+fn extract_js_lexical_decl(
+    node: tree_sitter::Node,
+    source: &[u8],
+    is_exported: bool,
+    variables: &mut Vec<VariableInfo>,
+) {
+    let kind = {
+        let mut c = node.walk();
+        let mut k = "let".to_string();
+        for child in node.children(&mut c) {
+            let t = node_text(child, source);
+            if t == "const" || t == "let" {
+                k = t.to_string();
+                break;
+            }
+        }
+        k
+    };
+    let mut c = node.walk();
+    for decl in node.children(&mut c) {
+        if decl.kind() != "variable_declarator" {
+            continue;
+        }
+        if let Some(val) = decl.child_by_field_name("value") {
+            if val.kind() == "arrow_function" || val.kind() == "function" {
+                continue;
+            }
+        }
+        if let Some(name_node) = decl.child_by_field_name("name") {
+            variables.push(VariableInfo {
+                name: node_text(name_node, source).to_string(),
+                kind: kind.clone(),
+                start_line: node.start_position().row + 1,
+                is_exported,
+            });
+        }
     }
 }
 

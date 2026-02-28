@@ -25,6 +25,7 @@ pub struct ImportInfo {
     pub source: String,
     pub names: Vec<String>,
     pub is_default: bool,
+    pub line: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +43,14 @@ pub struct ClassInfo {
     pub kind: String, // "class", "interface", "struct", "enum", "trait"
 }
 
+#[derive(Debug, Clone)]
+pub struct VariableInfo {
+    pub name: String,
+    pub kind: String, // "const" | "static" | "let" | "var"
+    pub start_line: usize,
+    pub is_exported: bool,
+}
+
 // ---------------------------------------------------------------------------
 // LanguageAdapter trait
 // ---------------------------------------------------------------------------
@@ -52,6 +61,9 @@ pub trait LanguageAdapter: Send + Sync {
     fn extract_imports(&self, tree: &tree_sitter::Tree, source: &[u8]) -> Vec<ImportInfo>;
     fn extract_exports(&self, tree: &tree_sitter::Tree, source: &[u8]) -> Vec<ExportInfo>;
     fn extract_classes(&self, tree: &tree_sitter::Tree, source: &[u8]) -> Vec<ClassInfo>;
+    fn extract_variables(&self, _tree: &tree_sitter::Tree, _source: &[u8]) -> Vec<VariableInfo> {
+        Vec::new()
+    }
 }
 
 // ---------------------------------------------------------------------------

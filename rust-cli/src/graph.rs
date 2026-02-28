@@ -22,6 +22,8 @@ pub struct ImportInfo {
     pub symbols: Vec<String>,
     #[serde(rename = "isExternal")]
     pub is_external: bool,
+    #[serde(rename = "importLine", default)]
+    pub import_line: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,6 +46,25 @@ pub struct TypeInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VariableInfo {
+    pub name: String,
+    pub kind: String, // "const" | "static" | "let" | "var"
+    #[serde(rename = "startLine")]
+    pub start_line: u32,
+    #[serde(rename = "isExported", default)]
+    pub is_exported: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SymbolRef {
+    pub symbol: String,
+    #[serde(rename = "importLine", default)]
+    pub import_line: u32,
+    #[serde(rename = "useLines", default)]
+    pub use_lines: Vec<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileEntry {
     pub language: String,
     pub module: String,
@@ -52,10 +73,14 @@ pub struct FileEntry {
     pub functions: Vec<FunctionInfo>,
     pub classes: Vec<ClassInfo>,
     pub types: Vec<TypeInfo>,
+    #[serde(default)]
+    pub variables: Vec<VariableInfo>,
     pub imports: Vec<ImportInfo>,
     pub exports: Vec<String>,
     #[serde(rename = "isEntryPoint")]
     pub is_entry_point: bool,
+    #[serde(rename = "symbolRefs", default)]
+    pub symbol_refs: BTreeMap<String, SymbolRef>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,6 +106,8 @@ pub struct GraphSummary {
     pub total_functions: u32,
     #[serde(rename = "totalClasses")]
     pub total_classes: u32,
+    #[serde(rename = "totalVariables", default)]
+    pub total_variables: u32,
     pub languages: HashMap<String, u32>,
     pub modules: Vec<String>,
     #[serde(rename = "entryPoints")]
@@ -153,6 +180,7 @@ pub fn create_empty_graph(project_name: &str, root_dir: &str) -> CodeGraph {
             total_files: 0,
             total_functions: 0,
             total_classes: 0,
+            total_variables: 0,
             languages: HashMap::new(),
             modules: vec![],
             entry_points: vec![],

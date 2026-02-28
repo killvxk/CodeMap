@@ -173,9 +173,11 @@ mod tests {
                 functions: vec![],
                 classes: vec![],
                 types: vec![],
+                variables: vec![],
                 imports: vec![],
                 exports: vec![],
                 is_entry_point: false,
+                symbol_refs: std::collections::BTreeMap::new(),
             },
         );
 
@@ -195,6 +197,7 @@ mod tests {
                 total_files: 3,
                 total_functions: 0,
                 total_classes: 0,
+                total_variables: 0,
                 languages: HashMap::new(),
                 modules: vec!["core".to_string(), "utils".to_string(), "app".to_string()],
                 entry_points: vec![],

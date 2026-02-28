@@ -1,6 +1,6 @@
 use tree_sitter::{Language, Tree};
 use super::{
-    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter,
+    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter, VariableInfo,
     node_text, strip_quotes, walk_nodes,
 };
 
@@ -63,6 +63,7 @@ impl LanguageAdapter for PythonAdapter {
                                     source: name.clone(),
                                     names: vec![name],
                                     is_default: false,
+                                    line: node.start_position().row + 1,
                                 });
                             }
                             "aliased_import" => {
@@ -73,6 +74,7 @@ impl LanguageAdapter for PythonAdapter {
                                         source: name.clone(),
                                         names: vec![name],
                                         is_default: false,
+                                        line: node.start_position().row + 1,
                                     });
                                 }
                             }
@@ -114,6 +116,7 @@ impl LanguageAdapter for PythonAdapter {
                         source: module,
                         names,
                         is_default: false,
+                        line: node.start_position().row + 1,
                     });
                 }
                 _ => {}
@@ -172,6 +175,38 @@ impl LanguageAdapter for PythonAdapter {
             }
         }
         classes
+    }
+
+    fn extract_variables(&self, tree: &Tree, source: &[u8]) -> Vec<VariableInfo> {
+        let mut variables = Vec::new();
+        let root = tree.root_node();
+        let mut cursor = root.walk();
+        for child in root.children(&mut cursor) {
+            // expression_statement > assignment
+            let assignment = if child.kind() == "expression_statement" {
+                child.named_child(0).filter(|n| n.kind() == "assignment")
+            } else if child.kind() == "assignment" {
+                Some(child)
+            } else {
+                None
+            };
+            if let Some(assign) = assignment {
+                if let Some(left) = assign.child_by_field_name("left") {
+                    // 只处理简单 identifier（排除元组解包等）
+                    if left.kind() == "identifier" {
+                        let name = node_text(left, source).to_string();
+                        let is_exported = !name.starts_with('_');
+                        variables.push(VariableInfo {
+                            name,
+                            kind: "var".into(),
+                            start_line: child.start_position().row + 1,
+                            is_exported,
+                        });
+                    }
+                }
+            }
+        }
+        variables
     }
 }
 

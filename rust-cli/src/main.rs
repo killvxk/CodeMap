@@ -13,7 +13,7 @@ mod slicer;
 mod traverser;
 
 #[derive(Parser)]
-#[command(name = "codegraph", about = "AST-based code graph generator", version = "0.2.0")]
+#[command(name = "codegraph", about = "AST-based code graph generator", version = "0.2.5")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,

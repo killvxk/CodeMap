@@ -10,6 +10,8 @@ AST-based code graph mapping plugin for [Claude Code](https://docs.anthropic.com
 - **AST 解析 / AST Parsing** — 使用 tree-sitter 原生绑定进行精确的结构分析，非正则猜测 / Uses tree-sitter native bindings for accurate structural analysis, no regex guessing
 - **多语言支持 / Multi-Language** — TypeScript, JavaScript, Python, Go, Rust, Java, C, C++
 - **智能切片 / Smart Slicing** — 项目概览 (~500 tokens) + 按模块切片 (~2-5k tokens)，替代全量源码 (~200k+) / Project overview (~500 tokens) + per-module slices (~2-5k tokens) instead of full source (~200k+)
+- **变量追踪 / Variable Tracking** — 追踪模块级 const/static/let/var 声明，支持按 `--type variable` 查询 / Tracks module-level const/static/let/var declarations, queryable with `--type variable`
+- **行号级引用 / Line-Level References** — 跨文件引用精确到 import 行号 + 使用行号，而非仅文件名 / Cross-file references pinpoint import line + usage lines, not just file names
 - **增量更新 / Incremental Updates** — 基于文件哈希比较检测变更，仅重新解析修改的文件 / File hash comparison detects changes; only re-parses modified files
 - **影响分析 / Impact Analysis** — 重构前查看哪些模块会受影响 / See what's affected before you refactor
 - **自动触发 / Auto-Triggering** — Skill 根据对话上下文自动激活 / Skills activate automatically based on your conversation context
@@ -170,8 +172,8 @@ cd rust-cli && cargo test
 # 2. 提交并打 tag，CI 自动构建并发布 / Commit, tag, and let CI build & release
 cd ..
 git add .
-git commit -m "release: v0.2.2"
-git tag v0.2.2
+git commit -m "release: v0.2.5"
+git tag v0.2.5
 git push origin main --tags
 # GitHub Actions 会自动为所有平台构建并创建 Release
 # GitHub Actions will automatically build for all platforms and create a Release
@@ -217,7 +219,7 @@ CodeMap/
 │   │   ├── path_utils.rs       #   共享路径工具函数
 │   │   ├── traverser.rs        #   文件遍历与语言检测
 │   │   └── languages/          #   语言适配器 (8 种)
-│   └── tests/                  #   集成测试 (286 tests)
+│   └── tests/                  #   集成测试 (127 tests)
 ├── README.md
 └── LICENSE                     # MIT
 ```
@@ -234,7 +236,7 @@ All commands run via `codegraph <command>` (pre-compiled binary, no Node.js requ
 |---------|-------------|
 | `scan <dir>` | 全量 AST 扫描，生成 `.codemap/` 图谱和切片 / Full AST scan, generates `.codemap/` with graph + slices |
 | `status [dir]` | 显示图谱元信息（文件数、模块、上次扫描时间）/ Show graph metadata (files, modules, last scan time) |
-| `query <symbol>` | 按名称搜索函数、类、类型 / Search for functions, classes, types by name |
+| `query <symbol>` | 按名称搜索函数、类、类型、变量 / Search for functions, classes, types, variables by name |
 | `slice [module]` | 输出项目概览或指定模块切片（JSON）/ Output project overview or a specific module slice as JSON |
 | `update [dir]` | 增量更新——仅重新解析变更的文件 / Incremental update — re-parse only changed files |
 | `impact <target>` | 分析修改目标会影响哪些模块 / Analyze which modules are affected by changing a target |
@@ -306,14 +308,14 @@ The `codemap` skill auto-activates based on conversation context and intelligent
 
 | 语言 / Language | 扩展名 / Extensions | 提取结构 / Extracted Structures |
 |----------|-----------|---------------------|
-| TypeScript | `.ts`, `.tsx` | 函数、导入、导出、类、接口、类型别名 / Functions, imports, exports, classes, interfaces, type aliases |
-| JavaScript | `.js`, `.jsx`, `.mjs`, `.cjs` | 函数、导入、导出、类 / Functions, imports, exports, classes |
-| Python | `.py` | 函数（含装饰器）、导入、`__all__` 导出、类 / Functions (decorated), imports, `__all__` exports, classes |
-| Go | `.go` | 函数、方法（含接收者）、导入、导出名、结构体、类型声明 / Functions, methods (with receiver), imports, exported names, structs, type specs |
-| Rust | `.rs` | 函数、impl 方法、use 声明、pub 导出、结构体、枚举、trait / Functions, impl methods, use declarations, pub exports, structs, enums, traits |
-| Java | `.java` | 方法、构造器、导入、public 导出、类、接口、枚举 / Methods, constructors, imports, public exports, classes, interfaces, enums |
-| C | `.c`, `.h` | 函数、`#include`、非 static 导出、结构体、枚举、typedef / Functions, `#include`, non-static exports, structs, enums, typedefs |
-| C++ | `.cpp`, `.cc`, `.cxx`, `.hpp`, `.hh` | 限定函数名（`Class::method`）、include、类、结构体、命名空间 / Qualified functions (`Class::method`), includes, classes, structs, namespaces |
+| TypeScript | `.ts`, `.tsx` | 函数、导入、导出、类、接口、类型别名、变量（const/let）/ Functions, imports, exports, classes, interfaces, type aliases, variables (const/let) |
+| JavaScript | `.js`, `.jsx`, `.mjs`, `.cjs` | 函数、导入、导出、类、变量（const/let）/ Functions, imports, exports, classes, variables (const/let) |
+| Python | `.py` | 函数（含装饰器）、导入、`__all__` 导出、类、模块级变量 / Functions (decorated), imports, `__all__` exports, classes, module-level variables |
+| Go | `.go` | 函数、方法（含接收者）、导入、导出名、结构体、类型声明、变量（var/const）/ Functions, methods (with receiver), imports, exported names, structs, type specs, variables (var/const) |
+| Rust | `.rs` | 函数、impl 方法、use 声明、pub 导出、结构体、枚举、trait、变量（const/static）/ Functions, impl methods, use declarations, pub exports, structs, enums, traits, variables (const/static) |
+| Java | `.java` | 方法、构造器、导入、public 导出、类、接口、枚举、静态字段 / Methods, constructors, imports, public exports, classes, interfaces, enums, static fields |
+| C | `.c`, `.h` | 函数、`#include`、非 static 导出、结构体、枚举、typedef、全局变量 / Functions, `#include`, non-static exports, structs, enums, typedefs, global variables |
+| C++ | `.cpp`, `.cc`, `.cxx`, `.hpp`, `.hh` | 限定函数名（`Class::method`）、include、类、结构体、命名空间、全局变量 / Qualified functions (`Class::method`), includes, classes, structs, namespaces, global variables |
 
 ---
 
@@ -341,7 +343,7 @@ Scanning produces a `.codemap/` directory inside the target project:
 ```bash
 cd rust-cli
 cargo test
-# 286 tests, all passing
+# 127 tests, all passing
 ```
 
 ## 许可证 / License

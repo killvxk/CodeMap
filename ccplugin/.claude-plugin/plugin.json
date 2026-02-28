@@ -1,6 +1,6 @@
 {
   "name": "codemap",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "AST-based code graph mapping plugin for Claude Code — scan once, persist structural graph, load compact slices to save ~95% tokens",
   "author": {
     "name": "killvxk",

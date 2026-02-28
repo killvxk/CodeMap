@@ -6,7 +6,7 @@ use crate::graph::{
 use crate::languages;
 use crate::path_utils::{normalize_path, strip_extension};
 use crate::traverser::{detect_language, effective_language, has_cpp_source_files, traverse_files, Language};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 // ---------------------------------------------------------------------------
@@ -58,11 +58,49 @@ pub fn convert_imports(lang_imports: &[languages::ImportInfo]) -> Vec<GraphImpor
         source: i.source.clone(),
         symbols: i.names.clone(),
         is_external: !i.source.starts_with('.'),
+        import_line: i.line as u32,
+    }).collect()
+}
+
+pub fn convert_variables(lang_vars: &[languages::VariableInfo]) -> Vec<crate::graph::VariableInfo> {
+    lang_vars.iter().map(|v| crate::graph::VariableInfo {
+        name: v.name.clone(),
+        kind: v.kind.clone(),
+        start_line: v.start_line as u32,
+        is_exported: v.is_exported,
     }).collect()
 }
 
 pub fn convert_exports(lang_exports: &[languages::ExportInfo]) -> Vec<String> {
     lang_exports.iter().map(|e| e.name.clone()).collect()
+}
+
+/// 扫描文件中导入符号的使用位置
+///
+/// 遍历 AST 中所有 identifier 节点，匹配 imported_symbols 集合，
+/// 返回 symbol → 使用行号列表 的映射。
+pub fn scan_symbol_uses(
+    tree: &tree_sitter::Tree,
+    source: &[u8],
+    imported_symbols: &HashSet<String>,
+) -> HashMap<String, Vec<u32>> {
+    let mut uses: HashMap<String, Vec<u32>> = HashMap::new();
+    languages::walk_nodes(tree.root_node(), &mut |node| {
+        if node.kind() != "identifier" {
+            return;
+        }
+        let text = languages::node_text(node, source);
+        if imported_symbols.contains(text) {
+            let line = node.start_position().row as u32 + 1;
+            uses.entry(text.to_string()).or_default().push(line);
+        }
+    });
+    // 去重排序
+    for lines in uses.values_mut() {
+        lines.sort();
+        lines.dedup();
+    }
+    uses
 }
 
 /// 根目录级别的常见目录名，跳过这些层级来确定模块名
@@ -130,13 +168,16 @@ pub fn scan_project(root_dir: &Path, exclude: &[String]) -> anyhow::Result<CodeG
         types: Vec<crate::graph::TypeInfo>,
         imports: Vec<crate::graph::ImportInfo>,
         exports: Vec<String>,
+        variables: Vec<crate::graph::VariableInfo>,
         is_entry_point: bool,
+        symbol_refs: BTreeMap<String, crate::graph::SymbolRef>,
     }
 
     let mut file_infos: Vec<(PathBuf, FileInfo)> = Vec::new();
     let mut language_counts: HashMap<String, u32> = HashMap::new();
     let mut total_functions = 0u32;
     let mut total_classes = 0u32;
+    let mut total_variables = 0u32;
     let mut module_set: HashSet<String> = HashSet::new();
 
     for abs_path in &files {
@@ -169,6 +210,7 @@ pub fn scan_project(root_dir: &Path, exclude: &[String]) -> anyhow::Result<CodeG
         let lang_imports = adapter.extract_imports(&tree, &content);
         let lang_exports = adapter.extract_exports(&tree, &content);
         let lang_classes = adapter.extract_classes(&tree, &content);
+        let lang_variables = adapter.extract_variables(&tree, &content);
         let lines = content.iter().filter(|&&b| b == b'\n').count() as u32 + 1;
 
         // 转换为 graph 数据结构
@@ -177,6 +219,24 @@ pub fn scan_project(root_dir: &Path, exclude: &[String]) -> anyhow::Result<CodeG
         let types = convert_types(&lang_classes, lang);
         let imports = convert_imports(&lang_imports);
         let exports = convert_exports(&lang_exports);
+        let variables = convert_variables(&lang_variables);
+
+        // 扫描导入符号的使用位置，构建 symbol_refs
+        let imported_symbols: HashSet<String> = imports.iter()
+            .flat_map(|imp| imp.symbols.iter().cloned())
+            .collect();
+        let symbol_uses = scan_symbol_uses(&tree, &content, &imported_symbols);
+        let mut symbol_refs: BTreeMap<String, crate::graph::SymbolRef> = BTreeMap::new();
+        for imp in &imports {
+            for sym in &imp.symbols {
+                let use_lines = symbol_uses.get(sym).cloned().unwrap_or_default();
+                symbol_refs.insert(sym.clone(), crate::graph::SymbolRef {
+                    symbol: sym.clone(),
+                    import_line: imp.import_line,
+                    use_lines,
+                });
+            }
+        }
 
         let module_name = detect_module_name(abs_path, root_dir);
         module_set.insert(module_name.clone());
@@ -185,6 +245,7 @@ pub fn scan_project(root_dir: &Path, exclude: &[String]) -> anyhow::Result<CodeG
         *language_counts.entry(lang_str.clone()).or_insert(0) += 1;
         total_functions += functions.len() as u32;
         total_classes += classes.len() as u32;
+        total_variables += variables.len() as u32;
 
         let rel_path = abs_path
             .strip_prefix(root_dir)
@@ -203,7 +264,9 @@ pub fn scan_project(root_dir: &Path, exclude: &[String]) -> anyhow::Result<CodeG
             types,
             imports,
             exports,
+            variables,
             is_entry_point: is_entry_point(abs_path),
+            symbol_refs,
         };
         file_infos.push((abs_path.clone(), entry));
     }
@@ -274,9 +337,11 @@ pub fn scan_project(root_dir: &Path, exclude: &[String]) -> anyhow::Result<CodeG
                 functions: info.functions.clone(),
                 classes: info.classes.clone(),
                 types: info.types.clone(),
+                variables: info.variables.clone(),
                 imports: info.imports.clone(),
                 exports: info.exports.clone(),
                 is_entry_point: info.is_entry_point,
+                symbol_refs: info.symbol_refs.clone(),
             },
         );
 
@@ -308,6 +373,7 @@ pub fn scan_project(root_dir: &Path, exclude: &[String]) -> anyhow::Result<CodeG
     graph.summary.total_files = file_infos.len() as u32;
     graph.summary.total_functions = total_functions;
     graph.summary.total_classes = total_classes;
+    graph.summary.total_variables = total_variables;
     graph.summary.languages = language_counts.clone();
     let mut mod_list: Vec<String> = module_set.into_iter().collect();
     mod_list.sort();
@@ -499,11 +565,13 @@ mod tests {
                 source: "./utils".to_string(),
                 names: vec!["helper".to_string()],
                 is_default: false,
+                line: 0,
             },
             crate::languages::ImportInfo {
                 source: "react".to_string(),
                 names: vec!["useState".to_string()],
                 is_default: false,
+                line: 0,
             },
         ];
         let imports = convert_imports(&lang_imports);

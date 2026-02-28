@@ -1,6 +1,6 @@
 use tree_sitter::{Language, Tree};
 use super::{
-    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter,
+    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter, VariableInfo,
     node_text, strip_quotes, walk_nodes,
 };
 
@@ -97,6 +97,7 @@ impl LanguageAdapter for GoAdapter {
                 source: src,
                 names: vec![symbol],
                 is_default: false,
+                line: node.start_position().row + 1,
             });
         });
         imports
@@ -164,6 +165,49 @@ impl LanguageAdapter for GoAdapter {
             }
         });
         classes
+    }
+
+    fn extract_variables(&self, tree: &Tree, source: &[u8]) -> Vec<VariableInfo> {
+        let mut variables = Vec::new();
+        let root = tree.root_node();
+        let mut cursor = root.walk();
+        for child in root.children(&mut cursor) {
+            match child.kind() {
+                "var_declaration" => {
+                    extract_go_specs(child, source, "var", &mut variables);
+                }
+                "const_declaration" => {
+                    extract_go_specs(child, source, "const", &mut variables);
+                }
+                _ => {}
+            }
+        }
+        variables
+    }
+}
+
+fn extract_go_specs(decl: tree_sitter::Node, source: &[u8], kind: &str, out: &mut Vec<VariableInfo>) {
+    let mut cursor = decl.walk();
+    for child in decl.children(&mut cursor) {
+        let spec_kind = child.kind();
+        if spec_kind != "var_spec" && spec_kind != "const_spec" {
+            continue;
+        }
+        // 第一个 identifier 子节点为变量名
+        let mut c = child.walk();
+        for sub in child.children(&mut c) {
+            if sub.kind() == "identifier" {
+                let name = node_text(sub, source).to_string();
+                let is_exported = is_go_exported(&name);
+                out.push(VariableInfo {
+                    name,
+                    kind: kind.to_string(),
+                    start_line: child.start_position().row + 1,
+                    is_exported,
+                });
+                break;
+            }
+        }
     }
 }
 
@@ -248,5 +292,31 @@ type Server struct {
         assert_eq!(classes.len(), 1);
         assert_eq!(classes[0].name, "Server");
         assert_eq!(classes[0].kind, "struct");
+    }
+
+    #[test]
+    fn test_go_extract_variables() {
+        let src = r#"package main
+
+var count int = 0
+var InternalBuf []byte
+
+const MaxSize = 100
+const version = "1.0"
+
+const (
+    StatusOK = 200
+    statusErr = 500
+)
+"#;
+        let tree = parse(src);
+        let adapter = GoAdapter::new();
+        let vars = adapter.extract_variables(&tree, src.as_bytes());
+        assert!(vars.iter().any(|v| v.name == "count" && v.kind == "var" && !v.is_exported));
+        assert!(vars.iter().any(|v| v.name == "InternalBuf" && v.kind == "var" && v.is_exported));
+        assert!(vars.iter().any(|v| v.name == "MaxSize" && v.kind == "const" && v.is_exported));
+        assert!(vars.iter().any(|v| v.name == "version" && v.kind == "const" && !v.is_exported));
+        assert!(vars.iter().any(|v| v.name == "StatusOK" && v.kind == "const" && v.is_exported));
+        assert!(vars.iter().any(|v| v.name == "statusErr" && v.kind == "const" && !v.is_exported));
     }
 }

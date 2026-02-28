@@ -9,6 +9,7 @@ description: >
   影响分析, 重构, scan, load, query, impact, update, prompts, codemap, code graph,
   understand codebase, project overview, code structure, 了解代码, 开始工作,
   查找函数, 哪里定义, 谁调用了, 影响范围, 依赖分析, 更新图谱, 刷新,
+  变量, 常量, variable, const, static, 全局变量, 模块变量,
   CLAUDE.md, 使用规范, 注入规则.
 ---
 
@@ -44,7 +45,8 @@ ls .codemap/graph.json 2>/dev/null && echo "CODEMAP_EXISTS" || echo "NO_CODEMAP"
 |----------|----------|
 | 会话刚开始 / 想了解项目 / 无特定需求 | 执行 `/codemap:load` 加载概览 |
 | 提到特定模块名 | 执行 `/codemap:load <模块名>` |
-| 问某个函数/类/类型在哪、谁调用了 | 执行 `/codemap:query <符号名>` |
+| 问某个函数/类/类型/变量在哪、谁调用了 | 执行 `/codemap:query <符号名>` |
+| 查询变量/常量定义 | 执行 `/codemap:query <变量名> --type variable` |
 | 谈到重构、改动影响、风险评估 | 执行 `/codemap:impact <目标>` |
 | 说代码改了、图谱过期、要刷新 | 执行 `/codemap:update` |
 | 要重新全量扫描 | 执行 `/codemap:scan` |

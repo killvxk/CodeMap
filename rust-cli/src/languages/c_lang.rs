@@ -1,6 +1,6 @@
 use tree_sitter::{Language, Tree};
 use super::{
-    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter,
+    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter, VariableInfo,
     find_descendant_of_type, node_text, walk_nodes,
 };
 
@@ -37,6 +37,10 @@ impl LanguageAdapter for CAdapter {
 
     fn extract_classes(&self, tree: &Tree, source: &[u8]) -> Vec<ClassInfo> {
         extract_c_classes(tree, source)
+    }
+
+    fn extract_variables(&self, tree: &Tree, source: &[u8]) -> Vec<VariableInfo> {
+        extract_c_variables(tree, source, false)
     }
 }
 
@@ -94,6 +98,7 @@ pub fn extract_c_includes(tree: &Tree, source: &[u8]) -> Vec<ImportInfo> {
             source: raw,
             names: Vec::new(),
             is_default: is_system,
+            line: node.start_position().row + 1,
         });
     });
     imports
@@ -185,6 +190,93 @@ fn has_storage_class_static(func_def: tree_sitter::Node, source: &[u8]) -> bool 
     false
 }
 
+/// 提取 C/C++ 全局变量（translation_unit 直接子节点中的 declaration）
+/// allow_constexpr: C++ 时传 true，识别 constexpr 关键字
+pub fn extract_c_variables(tree: &Tree, source: &[u8], allow_constexpr: bool) -> Vec<VariableInfo> {
+    let mut variables = Vec::new();
+    let root = tree.root_node();
+    let mut cursor = root.walk();
+    for child in root.children(&mut cursor) {
+        if child.kind() != "declaration" {
+            continue;
+        }
+        // 排除函数声明（含 function_declarator 子节点）
+        if child_has_func_decl(child) {
+            continue;
+        }
+        // 判断 kind
+        let has_const = child_has_const(child, source, allow_constexpr);
+        let kind = if has_const { "const" } else { "var" };
+        // is_exported: 有 extern 说明符，或没有 static 说明符（C 全局默认外部可见）
+        let has_static = child_has_storage_class(child, source, "static");
+        let has_extern = child_has_storage_class(child, source, "extern");
+        let is_exported = has_extern || !has_static;
+        // 提取变量名：找 declarator 中的 identifier
+        let mut c = child.walk();
+        for decl_child in child.children(&mut c) {
+            let name_opt = match decl_child.kind() {
+                "identifier" => Some(decl_child),
+                "init_declarator" | "pointer_declarator" | "array_declarator" => {
+                    find_descendant_of_type(decl_child, "identifier")
+                }
+                _ => None,
+            };
+            if let Some(name_node) = name_opt {
+                let name = node_text(name_node, source).to_string();
+                if name.is_empty() {
+                    continue;
+                }
+                variables.push(VariableInfo {
+                    name,
+                    kind: kind.to_string(),
+                    start_line: child.start_position().row + 1,
+                    is_exported,
+                });
+                break;
+            }
+        }
+    }
+    variables
+}
+
+fn child_has_func_decl(node: tree_sitter::Node) -> bool {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "function_declarator" {
+            return true;
+        }
+        if child.kind() == "pointer_declarator"
+            && find_descendant_of_type(child, "function_declarator").is_some()
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn child_has_const(node: tree_sitter::Node, source: &[u8], allow_constexpr: bool) -> bool {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "type_qualifier" {
+            let text = node_text(child, source);
+            if text == "const" || (allow_constexpr && text == "constexpr") {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn child_has_storage_class(node: tree_sitter::Node, source: &[u8], class: &str) -> bool {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "storage_class_specifier" && node_text(child, source) == class {
+            return true;
+        }
+    }
+    false
+}
+
 fn bare_identifier(text: &str) -> String {
     if let Some(idx) = text.rfind("::") {
         text[idx + 2..].to_string()
@@ -258,5 +350,22 @@ struct Point {
         let adapter = CAdapter::new();
         let classes = adapter.extract_classes(&tree, src.as_bytes());
         assert!(classes.iter().any(|c| c.name == "Point" && c.kind == "struct"));
+    }
+
+    #[test]
+    fn test_c_extract_variables() {
+        let src = r#"
+int globalCount = 0;
+const int MAX = 100;
+static int internalVal = 5;
+extern int sharedVal;
+"#;
+        let tree = parse(src);
+        let adapter = CAdapter::new();
+        let vars = adapter.extract_variables(&tree, src.as_bytes());
+        assert!(vars.iter().any(|v| v.name == "globalCount" && v.kind == "var" && v.is_exported));
+        assert!(vars.iter().any(|v| v.name == "MAX" && v.kind == "const" && v.is_exported));
+        assert!(vars.iter().any(|v| v.name == "internalVal" && v.kind == "var" && !v.is_exported));
+        assert!(vars.iter().any(|v| v.name == "sharedVal" && v.is_exported));
     }
 }

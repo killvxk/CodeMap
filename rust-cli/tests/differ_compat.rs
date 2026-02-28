@@ -23,9 +23,11 @@ fn make_file_entry(module: &str, hash: &str, functions_count: usize, classes_cou
             end_line: 5,
         }).collect(),
         types: vec![],
+        variables: vec![],
         imports: vec![],
         exports: vec![],
         is_entry_point: false,
+        symbol_refs: std::collections::BTreeMap::new(),
     }
 }
 
@@ -62,6 +64,7 @@ fn make_graph() -> CodeGraph {
             total_files: 3,
             total_functions: 2,
             total_classes: 0,
+            total_variables: 0,
             languages: [("typescript".to_string(), 3u32)].into_iter().collect(),
             modules: vec!["api".to_string(), "auth".to_string(), "old".to_string()],
             entry_points: vec![],

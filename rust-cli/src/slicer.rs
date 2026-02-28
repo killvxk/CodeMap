@@ -12,6 +12,8 @@ pub struct ModuleStats {
     pub total_functions: u32,
     #[serde(rename = "totalClasses")]
     pub total_classes: u32,
+    #[serde(rename = "totalVariables", default)]
+    pub total_variables: u32,
     #[serde(rename = "totalLines")]
     pub total_lines: u32,
 }
@@ -51,6 +53,8 @@ pub struct SliceFile {
     pub functions: Vec<crate::graph::FunctionInfo>,
     pub classes: Vec<crate::graph::ClassInfo>,
     pub types: Vec<crate::graph::TypeInfo>,
+    #[serde(default)]
+    pub variables: Vec<crate::graph::VariableInfo>,
     pub imports: Vec<crate::graph::ImportInfo>,
     pub exports: Vec<String>,
     #[serde(rename = "isEntryPoint")]
@@ -138,6 +142,7 @@ pub fn build_module_slice(graph: &CodeGraph, mod_name: &str, mod_data: &ModuleEn
     let mut all_exports: Vec<String> = Vec::new();
     let mut total_functions = 0u32;
     let mut total_classes = 0u32;
+    let mut total_variables = 0u32;
     let mut total_lines = 0u32;
 
     for file_path in &mod_data.files {
@@ -145,6 +150,7 @@ pub fn build_module_slice(graph: &CodeGraph, mod_name: &str, mod_data: &ModuleEn
             all_exports.extend(file_data.exports.clone());
             total_functions += file_data.functions.len() as u32;
             total_classes += file_data.classes.len() as u32;
+            total_variables += file_data.variables.len() as u32;
             total_lines += file_data.lines;
 
             files.push(SliceFile {
@@ -154,6 +160,7 @@ pub fn build_module_slice(graph: &CodeGraph, mod_name: &str, mod_data: &ModuleEn
                 functions: file_data.functions.clone(),
                 classes: file_data.classes.clone(),
                 types: file_data.types.clone(),
+                variables: file_data.variables.clone(),
                 imports: file_data.imports.clone(),
                 exports: file_data.exports.clone(),
                 is_entry_point: file_data.is_entry_point,
@@ -173,6 +180,7 @@ pub fn build_module_slice(graph: &CodeGraph, mod_name: &str, mod_data: &ModuleEn
             total_files: mod_data.files.len() as u32,
             total_functions,
             total_classes,
+            total_variables,
             total_lines,
         },
     }
@@ -211,6 +219,7 @@ pub fn get_module_slice_with_deps(
                         total_files: 0,
                         total_functions: 0,
                         total_classes: 0,
+                        total_variables: 0,
                         total_lines: 0,
                     },
                 }
@@ -253,6 +262,7 @@ fn collect_module_stats(
     let mut all_exports: Vec<String> = Vec::new();
     let mut total_functions = 0u32;
     let mut total_classes = 0u32;
+    let mut total_variables = 0u32;
     let mut total_lines = 0u32;
 
     for file_path in &mod_data.files {
@@ -260,6 +270,7 @@ fn collect_module_stats(
             all_exports.extend(file_data.exports.clone());
             total_functions += file_data.functions.len() as u32;
             total_classes += file_data.classes.len() as u32;
+            total_variables += file_data.variables.len() as u32;
             total_lines += file_data.lines;
         }
     }
@@ -268,6 +279,7 @@ fn collect_module_stats(
         total_files: mod_data.files.len() as u32,
         total_functions,
         total_classes,
+        total_variables,
         total_lines,
     };
     (all_exports, stats)
@@ -313,9 +325,11 @@ mod tests {
                 functions: vec![],
                 classes: vec![],
                 types: vec![],
+                variables: vec![],
                 imports: vec![],
                 exports: vec!["main".to_string()],
                 is_entry_point: true,
+                symbol_refs: std::collections::BTreeMap::new(),
             },
         );
 

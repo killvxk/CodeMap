@@ -13,8 +13,16 @@ pub struct LineRange {
 }
 
 #[derive(Debug, Clone)]
+pub struct CallerRef {
+    pub file: String,
+    pub module: String,
+    pub import_line: u32,
+    pub use_lines: Vec<u32>,
+}
+
+#[derive(Debug, Clone)]
 pub struct SymbolResult {
-    pub kind: String,       // "function" | "class" | "type"
+    pub kind: String,       // "function" | "class" | "type" | "variable"
     pub name: String,
     pub signature: Option<String>,
     pub file: String,
@@ -22,8 +30,10 @@ pub struct SymbolResult {
     pub lines: LineRange,
     /// 同文件中导入的其他符号（非自身）
     pub file_imports: Vec<String>,
-    /// 导入了该符号的其他文件（"module:file" 格式）
+    /// 导入了该符号的其他文件（"module:file" 格式）— 向后兼容
     pub imported_by: Vec<String>,
+    /// 行号级引用详情
+    pub imported_by_refs: Vec<CallerRef>,
 }
 
 #[derive(Debug, Clone)]
@@ -57,7 +67,7 @@ pub fn query_symbol(graph: &CodeGraph, symbol_name: &str, opts: &QueryOptions) -
             for func in &file_data.functions {
                 if matches_symbol(&func.name, symbol_name) {
                     let file_imports = collect_file_imports(file_data, &func.name);
-                    let imported_by = find_callers(graph, file_path, &func.name);
+                    let (imported_by, imported_by_refs) = find_callers(graph, file_path, &func.name);
                     results.push(SymbolResult {
                         kind: "function".into(),
                         name: func.name.clone(),
@@ -67,6 +77,7 @@ pub fn query_symbol(graph: &CodeGraph, symbol_name: &str, opts: &QueryOptions) -
                         lines: LineRange { start: func.start_line, end: func.end_line },
                         file_imports,
                         imported_by,
+                        imported_by_refs,
                     });
                 }
             }
@@ -76,7 +87,7 @@ pub fn query_symbol(graph: &CodeGraph, symbol_name: &str, opts: &QueryOptions) -
         if type_filter.is_none() || type_filter == Some("class") {
             for cls in &file_data.classes {
                 if matches_symbol(&cls.name, symbol_name) {
-                    let imported_by = find_callers(graph, file_path, &cls.name);
+                    let (imported_by, imported_by_refs) = find_callers(graph, file_path, &cls.name);
                     results.push(SymbolResult {
                         kind: "class".into(),
                         name: cls.name.clone(),
@@ -86,6 +97,7 @@ pub fn query_symbol(graph: &CodeGraph, symbol_name: &str, opts: &QueryOptions) -
                         lines: LineRange { start: cls.start_line, end: cls.end_line },
                         file_imports: vec![],
                         imported_by,
+                        imported_by_refs,
                     });
                 }
             }
@@ -95,7 +107,7 @@ pub fn query_symbol(graph: &CodeGraph, symbol_name: &str, opts: &QueryOptions) -
         if type_filter.is_none() || type_filter == Some("type") {
             for tp in &file_data.types {
                 if matches_symbol(&tp.name, symbol_name) {
-                    let imported_by = find_callers(graph, file_path, &tp.name);
+                    let (imported_by, imported_by_refs) = find_callers(graph, file_path, &tp.name);
                     results.push(SymbolResult {
                         kind: "type".into(),
                         name: tp.name.clone(),
@@ -105,6 +117,27 @@ pub fn query_symbol(graph: &CodeGraph, symbol_name: &str, opts: &QueryOptions) -
                         lines: LineRange { start: tp.start_line, end: tp.end_line },
                         file_imports: vec![],
                         imported_by,
+                        imported_by_refs,
+                    });
+                }
+            }
+        }
+
+        // 搜索变量
+        if type_filter.is_none() || type_filter == Some("variable") {
+            for var in &file_data.variables {
+                if matches_symbol(&var.name, symbol_name) {
+                    let (imported_by, imported_by_refs) = find_callers(graph, file_path, &var.name);
+                    results.push(SymbolResult {
+                        kind: "variable".into(),
+                        name: var.name.clone(),
+                        signature: Some(format!("{} {}", var.kind, var.name)),
+                        file: file_path.clone(),
+                        module: file_data.module.clone(),
+                        lines: LineRange { start: var.start_line, end: var.start_line },
+                        file_imports: vec![],
+                        imported_by,
+                        imported_by_refs,
                     });
                 }
             }
@@ -158,22 +191,43 @@ fn collect_file_imports(file_data: &FileEntry, self_name: &str) -> Vec<String> {
         .collect()
 }
 
-/// 查找导入了指定符号的其他文件，返回 "module:file" 格式列表
-fn find_callers(graph: &CodeGraph, source_file: &str, symbol_name: &str) -> Vec<String> {
+/// 查找导入了指定符号的其他文件
+/// 返回 (旧格式 "module:file" 列表, 新格式 CallerRef 列表)
+fn find_callers(graph: &CodeGraph, source_file: &str, symbol_name: &str) -> (Vec<String>, Vec<CallerRef>) {
     let mut callers = Vec::new();
+    let mut caller_refs = Vec::new();
     for (file_path, file_data) in &graph.files {
         if file_path == source_file {
             continue;
         }
+        // 检查 symbol_refs（行号级）
+        if let Some(sym_ref) = file_data.symbol_refs.get(symbol_name) {
+            callers.push(format!("{}:{}", file_data.module, file_path));
+            caller_refs.push(CallerRef {
+                file: file_path.clone(),
+                module: file_data.module.clone(),
+                import_line: sym_ref.import_line,
+                use_lines: sym_ref.use_lines.clone(),
+            });
+            continue;
+        }
+        // 回退：检查 imports 中的 symbols（兼容无 symbol_refs 的旧数据）
         for imp in &file_data.imports {
             if imp.symbols.iter().any(|s| s == symbol_name) {
                 callers.push(format!("{}:{}", file_data.module, file_path));
+                caller_refs.push(CallerRef {
+                    file: file_path.clone(),
+                    module: file_data.module.clone(),
+                    import_line: imp.import_line,
+                    use_lines: vec![],
+                });
                 break;
             }
         }
     }
     callers.sort();
-    callers
+    caller_refs.sort_by(|a, b| a.file.cmp(&b.file));
+    (callers, caller_refs)
 }
 
 // ── 格式化输出 ────────────────────────────────────────────────────────────────
@@ -197,7 +251,19 @@ pub fn format_symbol_results(results: &[SymbolResult]) -> String {
         out.push_str(&format!("  module:    {}\n", r.module));
         out.push_str(&format!("  lines:     {}-{}\n", r.lines.start, r.lines.end));
         if !r.imported_by.is_empty() {
-            out.push_str(&format!("  importedBy: {}\n", r.imported_by.join(", ")));
+            if !r.imported_by_refs.is_empty() && r.imported_by_refs.iter().any(|c| c.import_line > 0) {
+                out.push_str("  importedBy:\n");
+                for cr in &r.imported_by_refs {
+                    let mut parts = vec![format!("{}:{}", cr.file, cr.import_line)];
+                    if !cr.use_lines.is_empty() {
+                        let uses: Vec<String> = cr.use_lines.iter().map(|l| format!(":{}", l)).collect();
+                        parts.push(format!("(use {})", uses.join(" ")));
+                    }
+                    out.push_str(&format!("    {}\n", parts.join(" ")));
+                }
+            } else {
+                out.push_str(&format!("  importedBy: {}\n", r.imported_by.join(", ")));
+            }
         }
         out.push('\n');
     }
@@ -227,7 +293,7 @@ mod tests {
     use super::*;
     use crate::graph::{
         ClassInfo, CodeGraph, FileEntry, FunctionInfo, GraphConfig, GraphSummary,
-        ImportInfo, ModuleEntry, ProjectInfo, TypeInfo,
+        ImportInfo, ModuleEntry, ProjectInfo, TypeInfo, VariableInfo,
     };
     use std::collections::HashMap;
 
@@ -267,13 +333,21 @@ mod tests {
                     start_line: 2,
                     end_line: 2,
                 }],
+                variables: vec![VariableInfo {
+                    name: "MAX_RETRIES".into(),
+                    kind: "const".into(),
+                    start_line: 3,
+                    is_exported: true,
+                }],
                 imports: vec![ImportInfo {
-                    source: "./utils".into(),
+                    source: "utils/helper".into(),
                     symbols: vec!["hashPassword".into()],
                     is_external: false,
+                    import_line: 0,
                 }],
                 exports: vec!["login".into(), "logout".into(), "AuthService".into()],
                 is_entry_point: false,
+                symbol_refs: std::collections::BTreeMap::new(),
             },
         );
 
@@ -293,9 +367,11 @@ mod tests {
                 }],
                 classes: vec![],
                 types: vec![],
+                variables: vec![],
                 imports: vec![],
                 exports: vec!["hashPassword".into()],
                 is_entry_point: false,
+                symbol_refs: std::collections::BTreeMap::new(),
             },
         );
 
@@ -327,6 +403,7 @@ mod tests {
                 total_files: 2,
                 total_functions: 3,
                 total_classes: 1,
+                total_variables: 0,
                 languages: HashMap::new(),
                 modules: vec!["auth".into(), "utils".into()],
                 entry_points: vec![],
@@ -398,9 +475,11 @@ mod tests {
     fn test_find_callers() {
         let graph = make_graph();
         // auth/login.ts 导入了 hashPassword
-        let callers = find_callers(&graph, "utils/helper.ts", "hashPassword");
+        let (callers, caller_refs) = find_callers(&graph, "utils/helper.ts", "hashPassword");
         assert_eq!(callers.len(), 1);
         assert!(callers[0].contains("auth"));
+        assert_eq!(caller_refs.len(), 1);
+        assert_eq!(caller_refs[0].file, "auth/login.ts");
     }
 
     #[test]
@@ -422,6 +501,35 @@ mod tests {
         let graph = make_graph();
         let deps = query_dependants(&graph, "utils");
         assert!(deps.contains(&"auth".to_string()));
+    }
+
+    #[test]
+    fn test_query_type_filter_variable() {
+        let graph = make_graph();
+        let opts = QueryOptions { type_filter: Some("variable".into()) };
+        let results = query_symbol(&graph, "MAX_RETRIES", &opts);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "MAX_RETRIES");
+        assert_eq!(results[0].kind, "variable");
+        assert_eq!(results[0].lines.start, 3);
+        assert_eq!(results[0].lines.end, 3);
+    }
+
+    #[test]
+    fn test_query_variable_no_type_filter() {
+        let graph = make_graph();
+        let results = query_symbol(&graph, "MAX_RETRIES", &QueryOptions::default());
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].kind, "variable");
+        assert!(results[0].signature.as_deref() == Some("const MAX_RETRIES"));
+    }
+
+    #[test]
+    fn test_query_variable_excluded_by_function_filter() {
+        let graph = make_graph();
+        let opts = QueryOptions { type_filter: Some("function".into()) };
+        let results = query_symbol(&graph, "MAX_RETRIES", &opts);
+        assert!(results.is_empty());
     }
 
     #[test]

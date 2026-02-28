@@ -1,6 +1,6 @@
 use tree_sitter::{Language, Tree};
 use super::{
-    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter,
+    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter, VariableInfo,
     node_text, walk_nodes,
 };
 
@@ -75,12 +75,14 @@ impl LanguageAdapter for JavaAdapter {
                     source: src,
                     names: vec![symbol],
                     is_default: false,
+                    line: node.start_position().row + 1,
                 });
             } else {
                 imports.push(ImportInfo {
                     source: path,
                     names: Vec::new(),
                     is_default: false,
+                    line: node.start_position().row + 1,
                 });
             }
         });
@@ -129,6 +131,36 @@ impl LanguageAdapter for JavaAdapter {
             }
         });
         classes
+    }
+
+    fn extract_variables(&self, tree: &Tree, source: &[u8]) -> Vec<VariableInfo> {
+        let mut variables = Vec::new();
+        walk_nodes(tree.root_node(), &mut |node| {
+            if node.kind() != "field_declaration" {
+                return;
+            }
+            // 只处理带 static 修饰符的字段
+            if !has_modifier(node, source, "static") {
+                return;
+            }
+            let kind = if has_modifier(node, source, "final") { "const" } else { "static" };
+            let is_exported = has_modifier(node, source, "public");
+            // 遍历 variable_declarator 子节点
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                if child.kind() == "variable_declarator" {
+                    if let Some(name_node) = child.child_by_field_name("name") {
+                        variables.push(VariableInfo {
+                            name: node_text(name_node, source).to_string(),
+                            kind: kind.to_string(),
+                            start_line: node.start_position().row + 1,
+                            is_exported,
+                        });
+                    }
+                }
+            }
+        });
+        variables
     }
 }
 
@@ -237,5 +269,23 @@ public interface Runnable {}
         let classes = adapter.extract_classes(&tree, src.as_bytes());
         assert!(classes.iter().any(|c| c.name == "Animal" && c.kind == "class"));
         assert!(classes.iter().any(|c| c.name == "Runnable" && c.kind == "interface"));
+    }
+
+    #[test]
+    fn test_java_extract_variables() {
+        let src = r#"
+public class Config {
+    public static final int MAX_SIZE = 100;
+    private static String prefix = "app";
+    int instanceField = 0;
+}
+"#;
+        let tree = parse(src);
+        let adapter = JavaAdapter::new();
+        let vars = adapter.extract_variables(&tree, src.as_bytes());
+        assert!(vars.iter().any(|v| v.name == "MAX_SIZE" && v.kind == "const" && v.is_exported));
+        assert!(vars.iter().any(|v| v.name == "prefix" && v.kind == "static" && !v.is_exported));
+        // instanceField 没有 static，不应出现
+        assert!(!vars.iter().any(|v| v.name == "instanceField"));
     }
 }

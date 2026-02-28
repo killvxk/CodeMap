@@ -1,9 +1,9 @@
 use tree_sitter::{Language, Tree};
 use super::{
-    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter,
+    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter, VariableInfo,
     find_descendant_of_type, node_text, walk_nodes,
 };
-use super::c_lang::{extract_c_includes, extract_c_functions, extract_c_exports, extract_c_classes};
+use super::c_lang::{extract_c_includes, extract_c_functions, extract_c_exports, extract_c_classes, extract_c_variables};
 
 pub struct CppAdapter;
 
@@ -88,6 +88,10 @@ impl LanguageAdapter for CppAdapter {
             }
         });
         classes
+    }
+
+    fn extract_variables(&self, tree: &Tree, source: &[u8]) -> Vec<VariableInfo> {
+        extract_c_variables(tree, source, true)
     }
 }
 
@@ -179,5 +183,22 @@ namespace MyLib {
         // Node.js 行为：namespace 本身不出现在 exports 中
         assert!(!exports.iter().any(|e| e.name == "MyLib" && e.kind == "namespace"),
             "namespace should not appear in exports");
+    }
+
+    #[test]
+    fn test_cpp_extract_variables() {
+        let src = r#"
+int globalVal = 42;
+const int MAX_CONN = 10;
+static int internalCounter = 0;
+constexpr double PI = 3.14;
+"#;
+        let tree = parse(src);
+        let adapter = CppAdapter::new();
+        let vars = adapter.extract_variables(&tree, src.as_bytes());
+        assert!(vars.iter().any(|v| v.name == "globalVal" && v.kind == "var" && v.is_exported));
+        assert!(vars.iter().any(|v| v.name == "MAX_CONN" && v.kind == "const"));
+        assert!(vars.iter().any(|v| v.name == "internalCounter" && !v.is_exported));
+        assert!(vars.iter().any(|v| v.name == "PI" && v.kind == "const"));
     }
 }

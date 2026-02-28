@@ -125,6 +125,7 @@ pub fn run(args: UpdateArgs) {
         let lang_imports = adapter.extract_imports(&tree, content);
         let lang_exports = adapter.extract_exports(&tree, content);
         let lang_classes = adapter.extract_classes(&tree, content);
+        let lang_variables = adapter.extract_variables(&tree, content);
         let lines = content.iter().filter(|&&b| b == b'\n').count() as u32 + 1;
 
         let functions = crate::scanner::convert_functions(&lang_functions);
@@ -132,6 +133,24 @@ pub fn run(args: UpdateArgs) {
         let types = crate::scanner::convert_types(&lang_classes, lang);
         let imports = crate::scanner::convert_imports(&lang_imports);
         let exports = crate::scanner::convert_exports(&lang_exports);
+        let variables = crate::scanner::convert_variables(&lang_variables);
+
+        // 构建 symbol_refs（与 scan_project 一致）
+        let imported_symbols: std::collections::HashSet<String> = imports.iter()
+            .flat_map(|imp| imp.symbols.iter().cloned())
+            .collect();
+        let symbol_uses = crate::scanner::scan_symbol_uses(&tree, content, &imported_symbols);
+        let mut symbol_refs: std::collections::BTreeMap<String, crate::graph::SymbolRef> = std::collections::BTreeMap::new();
+        for imp in &imports {
+            for sym in &imp.symbols {
+                let use_lines = symbol_uses.get(sym).cloned().unwrap_or_default();
+                symbol_refs.insert(sym.clone(), crate::graph::SymbolRef {
+                    symbol: sym.clone(),
+                    import_line: imp.import_line,
+                    use_lines,
+                });
+            }
+        }
 
         let module_name = crate::scanner::detect_module_name(&abs_path, &root);
         let hash = new_hashes[rel_path].clone();
@@ -146,9 +165,11 @@ pub fn run(args: UpdateArgs) {
                 functions,
                 classes,
                 types,
+                variables,
                 imports,
                 exports,
                 is_entry_point: crate::graph::is_entry_point(&abs_path),
+                symbol_refs,
             },
         );
     }

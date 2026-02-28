@@ -239,9 +239,11 @@ mod tests {
             functions: vec![],
             classes: vec![],
             types: vec![],
+            variables: vec![],
             imports: vec![],
             exports: vec![],
             is_entry_point: false,
+            symbol_refs: std::collections::BTreeMap::new(),
         }
     }
 
@@ -387,6 +389,7 @@ mod tests {
             source: "../utils/helper".to_string(),
             symbols: vec![],
             is_external: false,
+            import_line: 0,
         }];
         graph.files.insert("src/auth/login.ts".to_string(), auth_file);
 

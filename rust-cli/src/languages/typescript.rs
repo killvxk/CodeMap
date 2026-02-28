@@ -1,8 +1,8 @@
-use tree_sitter::{Language, Tree};
 use super::{
-    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter, VariableInfo,
-    find_child_of_type, node_text, strip_quotes, walk_nodes,
+    find_child_of_type, node_text, strip_quotes, walk_nodes, ClassInfo, ExportInfo, FunctionInfo,
+    ImportInfo, LanguageAdapter, VariableInfo,
 };
+use tree_sitter::{Language, Tree};
 
 pub struct TypeScriptAdapter {
     tsx: bool,
@@ -43,9 +43,9 @@ impl LanguageAdapter for TypeScriptAdapter {
             // export const foo = (args) => { ... }
             if node.kind() == "lexical_declaration" {
                 let parent = node.parent();
-                let is_top_level = parent.map(|p| {
-                    p.kind() == "program" || p.kind() == "export_statement"
-                }).unwrap_or(false);
+                let is_top_level = parent
+                    .map(|p| p.kind() == "program" || p.kind() == "export_statement")
+                    .unwrap_or(false);
                 if is_top_level {
                     let mut cursor = node.walk();
                     for child in node.children(&mut cursor) {
@@ -55,10 +55,12 @@ impl LanguageAdapter for TypeScriptAdapter {
                                 if val.kind() == "arrow_function" {
                                     if let Some(name_node) = child.child_by_field_name("name") {
                                         let name = node_text(name_node, source).to_string();
-                                        let params = val.child_by_field_name("parameters")
+                                        let params = val
+                                            .child_by_field_name("parameters")
                                             .map(|p| extract_params_text(p, source))
                                             .unwrap_or_default();
-                                        let is_exported = node.parent()
+                                        let is_exported = node
+                                            .parent()
                                             .map(|p| p.kind() == "export_statement")
                                             .unwrap_or(false);
                                         functions.push(FunctionInfo {
@@ -85,7 +87,8 @@ impl LanguageAdapter for TypeScriptAdapter {
             if node.kind() != "import_statement" {
                 return;
             }
-            let source_node = node.child_by_field_name("source")
+            let source_node = node
+                .child_by_field_name("source")
                 .or_else(|| find_child_of_type(node, "string"));
             let src = match source_node {
                 Some(n) => strip_quotes(node_text(n, source)),
@@ -98,7 +101,8 @@ impl LanguageAdapter for TypeScriptAdapter {
                     let mut c = named.walk();
                     for spec in named.children(&mut c) {
                         if spec.kind() == "import_specifier" {
-                            let name_node = spec.child_by_field_name("name")
+                            let name_node = spec
+                                .child_by_field_name("name")
                                 .or_else(|| spec.named_child(0));
                             if let Some(n) = name_node {
                                 names.push(node_text(n, source).to_string());
@@ -133,25 +137,37 @@ impl LanguageAdapter for TypeScriptAdapter {
             // export function foo
             if let Some(func) = find_child_of_type(node, "function_declaration") {
                 if let Some(n) = func.child_by_field_name("name") {
-                    exports.push(ExportInfo { name: node_text(n, source).to_string(), kind: "function".into() });
+                    exports.push(ExportInfo {
+                        name: node_text(n, source).to_string(),
+                        kind: "function".into(),
+                    });
                 }
             }
             // export class Foo
             if let Some(cls) = find_child_of_type(node, "class_declaration") {
                 if let Some(n) = cls.child_by_field_name("name") {
-                    exports.push(ExportInfo { name: node_text(n, source).to_string(), kind: "class".into() });
+                    exports.push(ExportInfo {
+                        name: node_text(n, source).to_string(),
+                        kind: "class".into(),
+                    });
                 }
             }
             // export interface Foo
             if let Some(iface) = find_child_of_type(node, "interface_declaration") {
                 if let Some(n) = iface.child_by_field_name("name") {
-                    exports.push(ExportInfo { name: node_text(n, source).to_string(), kind: "interface".into() });
+                    exports.push(ExportInfo {
+                        name: node_text(n, source).to_string(),
+                        kind: "interface".into(),
+                    });
                 }
             }
             // export type Foo = ...
             if let Some(ta) = find_child_of_type(node, "type_alias_declaration") {
                 if let Some(n) = ta.child_by_field_name("name") {
-                    exports.push(ExportInfo { name: node_text(n, source).to_string(), kind: "type".into() });
+                    exports.push(ExportInfo {
+                        name: node_text(n, source).to_string(),
+                        kind: "type".into(),
+                    });
                 }
             }
             // export const/let/var
@@ -160,7 +176,10 @@ impl LanguageAdapter for TypeScriptAdapter {
                 for decl in lex.children(&mut c) {
                     if decl.kind() == "variable_declarator" {
                         if let Some(n) = decl.child_by_field_name("name") {
-                            exports.push(ExportInfo { name: node_text(n, source).to_string(), kind: "variable".into() });
+                            exports.push(ExportInfo {
+                                name: node_text(n, source).to_string(),
+                                kind: "variable".into(),
+                            });
                         }
                     }
                 }
@@ -170,10 +189,14 @@ impl LanguageAdapter for TypeScriptAdapter {
                 let mut c = clause.walk();
                 for spec in clause.children(&mut c) {
                     if spec.kind() == "export_specifier" {
-                        let n = spec.child_by_field_name("name")
+                        let n = spec
+                            .child_by_field_name("name")
                             .or_else(|| spec.named_child(0));
                         if let Some(n) = n {
-                            exports.push(ExportInfo { name: node_text(n, source).to_string(), kind: "variable".into() });
+                            exports.push(ExportInfo {
+                                name: node_text(n, source).to_string(),
+                                kind: "variable".into(),
+                            });
                         }
                     }
                 }
@@ -184,33 +207,31 @@ impl LanguageAdapter for TypeScriptAdapter {
 
     fn extract_classes(&self, tree: &Tree, source: &[u8]) -> Vec<ClassInfo> {
         let mut classes = Vec::new();
-        walk_nodes(tree.root_node(), &mut |node| {
-            match node.kind() {
-                "class_declaration" => {
-                    if let Some(n) = node.child_by_field_name("name") {
-                        let methods = extract_class_methods(node, source);
-                        classes.push(ClassInfo {
-                            name: node_text(n, source).to_string(),
-                            start_line: node.start_position().row + 1,
-                            end_line: node.end_position().row + 1,
-                            methods,
-                            kind: "class".into(),
-                        });
-                    }
+        walk_nodes(tree.root_node(), &mut |node| match node.kind() {
+            "class_declaration" => {
+                if let Some(n) = node.child_by_field_name("name") {
+                    let methods = extract_class_methods(node, source);
+                    classes.push(ClassInfo {
+                        name: node_text(n, source).to_string(),
+                        start_line: node.start_position().row + 1,
+                        end_line: node.end_position().row + 1,
+                        methods,
+                        kind: "class".into(),
+                    });
                 }
-                "interface_declaration" => {
-                    if let Some(n) = node.child_by_field_name("name") {
-                        classes.push(ClassInfo {
-                            name: node_text(n, source).to_string(),
-                            start_line: node.start_position().row + 1,
-                            end_line: node.end_position().row + 1,
-                            methods: Vec::new(),
-                            kind: "interface".into(),
-                        });
-                    }
-                }
-                _ => {}
             }
+            "interface_declaration" => {
+                if let Some(n) = node.child_by_field_name("name") {
+                    classes.push(ClassInfo {
+                        name: node_text(n, source).to_string(),
+                        start_line: node.start_position().row + 1,
+                        end_line: node.end_position().row + 1,
+                        methods: Vec::new(),
+                        kind: "interface".into(),
+                    });
+                }
+            }
+            _ => {}
         });
         classes
     }
@@ -279,10 +300,12 @@ fn extract_ts_lexical_decl(
 fn parse_function_declaration(node: tree_sitter::Node, source: &[u8]) -> Option<FunctionInfo> {
     let name_node = node.child_by_field_name("name")?;
     let name = node_text(name_node, source).to_string();
-    let params = node.child_by_field_name("parameters")
+    let params = node
+        .child_by_field_name("parameters")
         .map(|p| extract_params_text(p, source))
         .unwrap_or_default();
-    let is_exported = node.parent()
+    let is_exported = node
+        .parent()
         .map(|p| p.kind() == "export_statement")
         .unwrap_or(false);
     Some(FunctionInfo {
@@ -300,7 +323,8 @@ fn extract_params_text(params_node: tree_sitter::Node, source: &[u8]) -> Vec<Str
     if inner.trim().is_empty() {
         return Vec::new();
     }
-    inner.split(',')
+    inner
+        .split(',')
         .map(|s| s.trim().split(':').next().unwrap_or("").trim().to_string())
         .filter(|s| !s.is_empty())
         .collect()
@@ -323,7 +347,11 @@ mod tests {
     use super::*;
 
     fn parse(source: &str, tsx: bool) -> tree_sitter::Tree {
-        let adapter = if tsx { TypeScriptAdapter::new_tsx() } else { TypeScriptAdapter::new() };
+        let adapter = if tsx {
+            TypeScriptAdapter::new_tsx()
+        } else {
+            TypeScriptAdapter::new()
+        };
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(&adapter.language()).unwrap();
         parser.parse(source, None).unwrap()
@@ -394,8 +422,12 @@ interface Runnable {}
         let tree = parse(src, false);
         let adapter = TypeScriptAdapter::new();
         let classes = adapter.extract_classes(&tree, src.as_bytes());
-        assert!(classes.iter().any(|c| c.name == "Animal" && c.kind == "class"));
-        assert!(classes.iter().any(|c| c.name == "Runnable" && c.kind == "interface"));
+        assert!(classes
+            .iter()
+            .any(|c| c.name == "Animal" && c.kind == "class"));
+        assert!(classes
+            .iter()
+            .any(|c| c.name == "Runnable" && c.kind == "interface"));
         let animal = classes.iter().find(|c| c.name == "Animal").unwrap();
         assert!(animal.methods.contains(&"speak".to_string()));
         assert!(animal.methods.contains(&"move".to_string()));
@@ -412,9 +444,15 @@ export const handler = () => {};
         let tree = parse(src, false);
         let adapter = TypeScriptAdapter::new();
         let vars = adapter.extract_variables(&tree, src.as_bytes());
-        assert!(vars.iter().any(|v| v.name == "MAX" && v.kind == "const" && !v.is_exported));
-        assert!(vars.iter().any(|v| v.name == "count" && v.kind == "let" && !v.is_exported));
-        assert!(vars.iter().any(|v| v.name == "API_URL" && v.kind == "const" && v.is_exported));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "MAX" && v.kind == "const" && !v.is_exported));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "count" && v.kind == "let" && !v.is_exported));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "API_URL" && v.kind == "const" && v.is_exported));
         // handler 是箭头函数，应被跳过
         assert!(!vars.iter().any(|v| v.name == "handler"));
     }

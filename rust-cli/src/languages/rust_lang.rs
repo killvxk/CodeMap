@@ -1,8 +1,8 @@
-use tree_sitter::{Language, Tree};
 use super::{
-    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter, VariableInfo,
-    node_text, walk_nodes,
+    node_text, walk_nodes, ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter,
+    VariableInfo,
 };
+use tree_sitter::{Language, Tree};
 
 pub struct RustAdapter;
 
@@ -39,7 +39,8 @@ impl LanguageAdapter for RustAdapter {
             } else {
                 node_text(name_node, source).to_string()
             };
-            let params = node.child_by_field_name("parameters")
+            let params = node
+                .child_by_field_name("parameters")
                 .map(|p| extract_rust_params(p, source))
                 .unwrap_or_default();
             let is_exported = has_pub_visibility(node, source);
@@ -90,6 +91,8 @@ impl LanguageAdapter for RustAdapter {
                 "trait_item" => "trait",
                 "type_item" => "type",
                 "mod_item" => "module",
+                "const_item" => "variable",
+                "static_item" => "variable",
                 _ => return,
             };
             if let Some(n) = node.child_by_field_name("name") {
@@ -104,43 +107,41 @@ impl LanguageAdapter for RustAdapter {
 
     fn extract_classes(&self, tree: &Tree, source: &[u8]) -> Vec<ClassInfo> {
         let mut classes = Vec::new();
-        walk_nodes(tree.root_node(), &mut |node| {
-            match node.kind() {
-                "struct_item" => {
-                    if let Some(n) = node.child_by_field_name("name") {
-                        classes.push(ClassInfo {
-                            name: node_text(n, source).to_string(),
-                            start_line: node.start_position().row + 1,
-                            end_line: node.end_position().row + 1,
-                            methods: Vec::new(),
-                            kind: "struct".into(),
-                        });
-                    }
+        walk_nodes(tree.root_node(), &mut |node| match node.kind() {
+            "struct_item" => {
+                if let Some(n) = node.child_by_field_name("name") {
+                    classes.push(ClassInfo {
+                        name: node_text(n, source).to_string(),
+                        start_line: node.start_position().row + 1,
+                        end_line: node.end_position().row + 1,
+                        methods: Vec::new(),
+                        kind: "struct".into(),
+                    });
                 }
-                "enum_item" => {
-                    if let Some(n) = node.child_by_field_name("name") {
-                        classes.push(ClassInfo {
-                            name: node_text(n, source).to_string(),
-                            start_line: node.start_position().row + 1,
-                            end_line: node.end_position().row + 1,
-                            methods: Vec::new(),
-                            kind: "enum".into(),
-                        });
-                    }
-                }
-                "trait_item" => {
-                    if let Some(n) = node.child_by_field_name("name") {
-                        classes.push(ClassInfo {
-                            name: node_text(n, source).to_string(),
-                            start_line: node.start_position().row + 1,
-                            end_line: node.end_position().row + 1,
-                            methods: Vec::new(),
-                            kind: "trait".into(),
-                        });
-                    }
-                }
-                _ => {}
             }
+            "enum_item" => {
+                if let Some(n) = node.child_by_field_name("name") {
+                    classes.push(ClassInfo {
+                        name: node_text(n, source).to_string(),
+                        start_line: node.start_position().row + 1,
+                        end_line: node.end_position().row + 1,
+                        methods: Vec::new(),
+                        kind: "enum".into(),
+                    });
+                }
+            }
+            "trait_item" => {
+                if let Some(n) = node.child_by_field_name("name") {
+                    classes.push(ClassInfo {
+                        name: node_text(n, source).to_string(),
+                        start_line: node.start_position().row + 1,
+                        end_line: node.end_position().row + 1,
+                        methods: Vec::new(),
+                        kind: "trait".into(),
+                    });
+                }
+            }
+            _ => {}
         });
         classes
     }
@@ -182,7 +183,8 @@ fn get_impl_type(node: tree_sitter::Node, source: &[u8]) -> Option<String> {
     let mut current = node.parent();
     while let Some(n) = current {
         if n.kind() == "impl_item" {
-            return n.child_by_field_name("type")
+            return n
+                .child_by_field_name("type")
                 .map(|t| node_text(t, source).to_string());
         }
         current = n.parent();
@@ -258,7 +260,11 @@ fn parse_use_tree(node: tree_sitter::Node, source: &[u8], result: &mut ImportInf
     }
 }
 
-fn extract_use_list_symbols(list_node: tree_sitter::Node, source: &[u8], symbols: &mut Vec<String>) {
+fn extract_use_list_symbols(
+    list_node: tree_sitter::Node,
+    source: &[u8],
+    symbols: &mut Vec<String>,
+) {
     let mut cursor = list_node.walk();
     for child in list_node.children(&mut cursor) {
         match child.kind() {
@@ -318,6 +324,31 @@ impl Foo {
     }
 
     #[test]
+    fn test_rust_extract_exports_const_static() {
+        let src = r#"
+pub const MAX_SIZE: usize = 1024;
+pub static COUNTER: u64 = 0;
+const PRIVATE_CONST: &str = "hidden";
+static PRIVATE_STATIC: bool = false;
+pub fn public_fn() {}
+"#;
+        let tree = parse(src);
+        let adapter = RustAdapter::new();
+        let exports = adapter.extract_exports(&tree, src.as_bytes());
+        assert!(exports
+            .iter()
+            .any(|e| e.name == "MAX_SIZE" && e.kind == "variable"));
+        assert!(exports
+            .iter()
+            .any(|e| e.name == "COUNTER" && e.kind == "variable"));
+        assert!(!exports.iter().any(|e| e.name == "PRIVATE_CONST"));
+        assert!(!exports.iter().any(|e| e.name == "PRIVATE_STATIC"));
+        assert!(exports
+            .iter()
+            .any(|e| e.name == "public_fn" && e.kind == "function"));
+    }
+
+    #[test]
     fn test_rust_extract_classes() {
         let src = r#"
 pub struct Server {
@@ -329,8 +360,14 @@ pub trait Handler {}
         let tree = parse(src);
         let adapter = RustAdapter::new();
         let classes = adapter.extract_classes(&tree, src.as_bytes());
-        assert!(classes.iter().any(|c| c.name == "Server" && c.kind == "struct"));
-        assert!(classes.iter().any(|c| c.name == "Status" && c.kind == "enum"));
-        assert!(classes.iter().any(|c| c.name == "Handler" && c.kind == "trait"));
+        assert!(classes
+            .iter()
+            .any(|c| c.name == "Server" && c.kind == "struct"));
+        assert!(classes
+            .iter()
+            .any(|c| c.name == "Status" && c.kind == "enum"));
+        assert!(classes
+            .iter()
+            .any(|c| c.name == "Handler" && c.kind == "trait"));
     }
 }

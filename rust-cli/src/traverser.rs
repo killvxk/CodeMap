@@ -146,15 +146,30 @@ mod tests {
 
     #[test]
     fn test_detect_language_typescript() {
-        assert_eq!(detect_language(Path::new("foo.ts")), Some(Language::TypeScript));
-        assert_eq!(detect_language(Path::new("foo.tsx")), Some(Language::TypeScript));
+        assert_eq!(
+            detect_language(Path::new("foo.ts")),
+            Some(Language::TypeScript)
+        );
+        assert_eq!(
+            detect_language(Path::new("foo.tsx")),
+            Some(Language::TypeScript)
+        );
     }
 
     #[test]
     fn test_detect_language_javascript() {
-        assert_eq!(detect_language(Path::new("foo.js")), Some(Language::JavaScript));
-        assert_eq!(detect_language(Path::new("foo.jsx")), Some(Language::JavaScript));
-        assert_eq!(detect_language(Path::new("foo.mjs")), Some(Language::JavaScript));
+        assert_eq!(
+            detect_language(Path::new("foo.js")),
+            Some(Language::JavaScript)
+        );
+        assert_eq!(
+            detect_language(Path::new("foo.jsx")),
+            Some(Language::JavaScript)
+        );
+        assert_eq!(
+            detect_language(Path::new("foo.mjs")),
+            Some(Language::JavaScript)
+        );
     }
 
     #[test]
@@ -182,10 +197,7 @@ mod tests {
 
     #[test]
     fn test_has_cpp_source_files() {
-        let files: Vec<PathBuf> = vec![
-            PathBuf::from("a.ts"),
-            PathBuf::from("b.cpp"),
-        ];
+        let files: Vec<PathBuf> = vec![PathBuf::from("a.ts"), PathBuf::from("b.cpp")];
         assert!(has_cpp_source_files(&files));
 
         let no_cpp: Vec<PathBuf> = vec![PathBuf::from("a.c"), PathBuf::from("b.h")];

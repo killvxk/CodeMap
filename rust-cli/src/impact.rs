@@ -126,9 +126,7 @@ fn bfs_dependants(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::graph::{
-        CodeGraph, FileEntry, GraphConfig, GraphSummary, ModuleEntry, ProjectInfo,
-    };
+    use crate::graph::{CodeGraph, FileEntry, GraphConfig, GraphSummary, ModuleEntry, ProjectInfo};
     use std::collections::HashMap;
 
     fn make_graph() -> CodeGraph {

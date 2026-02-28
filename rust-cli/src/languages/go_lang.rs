@@ -1,8 +1,8 @@
-use tree_sitter::{Language, Tree};
 use super::{
-    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter, VariableInfo,
-    node_text, strip_quotes, walk_nodes,
+    node_text, strip_quotes, walk_nodes, ClassInfo, ExportInfo, FunctionInfo, ImportInfo,
+    LanguageAdapter, VariableInfo,
 };
+use tree_sitter::{Language, Tree};
 
 pub struct GoAdapter;
 
@@ -25,42 +25,42 @@ impl LanguageAdapter for GoAdapter {
 
     fn extract_functions(&self, tree: &Tree, source: &[u8]) -> Vec<FunctionInfo> {
         let mut functions = Vec::new();
-        walk_nodes(tree.root_node(), &mut |node| {
-            match node.kind() {
-                "function_declaration" => {
-                    if let Some(name_node) = node.child_by_field_name("name") {
-                        let name = node_text(name_node, source).to_string();
-                        let params = node.child_by_field_name("parameters")
-                            .map(|p| extract_go_params(p, source))
-                            .unwrap_or_default();
-                        let is_exported = is_go_exported(&name);
-                        functions.push(FunctionInfo {
-                            name,
-                            start_line: node.start_position().row + 1,
-                            end_line: node.end_position().row + 1,
-                            params,
-                            is_exported,
-                        });
-                    }
+        walk_nodes(tree.root_node(), &mut |node| match node.kind() {
+            "function_declaration" => {
+                if let Some(name_node) = node.child_by_field_name("name") {
+                    let name = node_text(name_node, source).to_string();
+                    let params = node
+                        .child_by_field_name("parameters")
+                        .map(|p| extract_go_params(p, source))
+                        .unwrap_or_default();
+                    let is_exported = is_go_exported(&name);
+                    functions.push(FunctionInfo {
+                        name,
+                        start_line: node.start_position().row + 1,
+                        end_line: node.end_position().row + 1,
+                        params,
+                        is_exported,
+                    });
                 }
-                "method_declaration" => {
-                    if let Some(name_node) = node.child_by_field_name("name") {
-                        let name = node_text(name_node, source).to_string();
-                        let params = node.child_by_field_name("parameters")
-                            .map(|p| extract_go_params(p, source))
-                            .unwrap_or_default();
-                        let is_exported = is_go_exported(&name);
-                        functions.push(FunctionInfo {
-                            name,
-                            start_line: node.start_position().row + 1,
-                            end_line: node.end_position().row + 1,
-                            params,
-                            is_exported,
-                        });
-                    }
-                }
-                _ => {}
             }
+            "method_declaration" => {
+                if let Some(name_node) = node.child_by_field_name("name") {
+                    let name = node_text(name_node, source).to_string();
+                    let params = node
+                        .child_by_field_name("parameters")
+                        .map(|p| extract_go_params(p, source))
+                        .unwrap_or_default();
+                    let is_exported = is_go_exported(&name);
+                    functions.push(FunctionInfo {
+                        name,
+                        start_line: node.start_position().row + 1,
+                        end_line: node.end_position().row + 1,
+                        params,
+                        is_exported,
+                    });
+                }
+            }
+            _ => {}
         });
         functions
     }
@@ -105,33 +105,53 @@ impl LanguageAdapter for GoAdapter {
 
     fn extract_exports(&self, tree: &Tree, source: &[u8]) -> Vec<ExportInfo> {
         let mut exports = Vec::new();
-        walk_nodes(tree.root_node(), &mut |node| {
-            match node.kind() {
-                "function_declaration" | "method_declaration" => {
-                    if let Some(n) = node.child_by_field_name("name") {
-                        let name = node_text(n, source).to_string();
-                        if is_go_exported(&name) {
-                            exports.push(ExportInfo { name, kind: "function".into() });
-                        }
+        walk_nodes(tree.root_node(), &mut |node| match node.kind() {
+            "function_declaration" | "method_declaration" => {
+                if let Some(n) = node.child_by_field_name("name") {
+                    let name = node_text(n, source).to_string();
+                    if is_go_exported(&name) {
+                        exports.push(ExportInfo {
+                            name,
+                            kind: "function".into(),
+                        });
                     }
                 }
-                "type_spec" => {
-                    if let Some(n) = node.child_by_field_name("name") {
-                        let name = node_text(n, source).to_string();
-                        if is_go_exported(&name) {
-                            let kind = node.child_by_field_name("type")
-                                .map(|t| match t.kind() {
-                                    "struct_type" => "struct",
-                                    "interface_type" => "interface",
-                                    _ => "type",
-                                })
-                                .unwrap_or("type");
-                            exports.push(ExportInfo { name, kind: kind.into() });
-                        }
-                    }
-                }
-                _ => {}
             }
+            "type_spec" => {
+                if let Some(n) = node.child_by_field_name("name") {
+                    let name = node_text(n, source).to_string();
+                    if is_go_exported(&name) {
+                        let kind = node
+                            .child_by_field_name("type")
+                            .map(|t| match t.kind() {
+                                "struct_type" => "struct",
+                                "interface_type" => "interface",
+                                _ => "type",
+                            })
+                            .unwrap_or("type");
+                        exports.push(ExportInfo {
+                            name,
+                            kind: kind.into(),
+                        });
+                    }
+                }
+            }
+            "const_spec" | "var_spec" => {
+                let mut c = node.walk();
+                for sub in node.children(&mut c) {
+                    if sub.kind() == "identifier" {
+                        let name = node_text(sub, source).to_string();
+                        if is_go_exported(&name) {
+                            exports.push(ExportInfo {
+                                name,
+                                kind: "variable".into(),
+                            });
+                        }
+                        break;
+                    }
+                }
+            }
+            _ => {}
         });
         exports
     }
@@ -152,7 +172,8 @@ impl LanguageAdapter for GoAdapter {
                 _ => return,
             };
             if let Some(name_node) = node.child_by_field_name("name") {
-                let decl_node = node.parent()
+                let decl_node = node
+                    .parent()
                     .filter(|p| p.kind() == "type_declaration")
                     .unwrap_or(node);
                 classes.push(ClassInfo {
@@ -186,7 +207,12 @@ impl LanguageAdapter for GoAdapter {
     }
 }
 
-fn extract_go_specs(decl: tree_sitter::Node, source: &[u8], kind: &str, out: &mut Vec<VariableInfo>) {
+fn extract_go_specs(
+    decl: tree_sitter::Node,
+    source: &[u8],
+    kind: &str,
+    out: &mut Vec<VariableInfo>,
+) {
     let mut cursor = decl.walk();
     for child in decl.children(&mut cursor) {
         let spec_kind = child.kind();
@@ -212,14 +238,19 @@ fn extract_go_specs(decl: tree_sitter::Node, source: &[u8], kind: &str, out: &mu
 }
 
 fn is_go_exported(name: &str) -> bool {
-    name.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
+    name.chars()
+        .next()
+        .map(|c| c.is_uppercase())
+        .unwrap_or(false)
 }
 
 fn extract_go_params(params_node: tree_sitter::Node, source: &[u8]) -> Vec<String> {
     let mut params = Vec::new();
     let mut cursor = params_node.walk();
     for child in params_node.children(&mut cursor) {
-        if child.kind() == "parameter_declaration" || child.kind() == "variadic_parameter_declaration" {
+        if child.kind() == "parameter_declaration"
+            || child.kind() == "variadic_parameter_declaration"
+        {
             // 参数名在第一个 identifier 子节点
             let mut c = child.walk();
             for p in child.children(&mut c) {
@@ -312,11 +343,23 @@ const (
         let tree = parse(src);
         let adapter = GoAdapter::new();
         let vars = adapter.extract_variables(&tree, src.as_bytes());
-        assert!(vars.iter().any(|v| v.name == "count" && v.kind == "var" && !v.is_exported));
-        assert!(vars.iter().any(|v| v.name == "InternalBuf" && v.kind == "var" && v.is_exported));
-        assert!(vars.iter().any(|v| v.name == "MaxSize" && v.kind == "const" && v.is_exported));
-        assert!(vars.iter().any(|v| v.name == "version" && v.kind == "const" && !v.is_exported));
-        assert!(vars.iter().any(|v| v.name == "StatusOK" && v.kind == "const" && v.is_exported));
-        assert!(vars.iter().any(|v| v.name == "statusErr" && v.kind == "const" && !v.is_exported));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "count" && v.kind == "var" && !v.is_exported));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "InternalBuf" && v.kind == "var" && v.is_exported));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "MaxSize" && v.kind == "const" && v.is_exported));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "version" && v.kind == "const" && !v.is_exported));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "StatusOK" && v.kind == "const" && v.is_exported));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "statusErr" && v.kind == "const" && !v.is_exported));
     }
 }

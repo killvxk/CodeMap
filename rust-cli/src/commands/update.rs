@@ -67,15 +67,14 @@ pub fn run(args: UpdateArgs) {
 
     // 从 meta.fileHashes 读取旧哈希（与 Node.js update 逻辑一致）
     // 若 meta.json 不存在或无 fileHashes，回退到从 graph.files 提取
-    let old_hashes: HashMap<String, String> =
-        match crate::graph::load_meta(&codemap_dir) {
-            Ok(meta) if !meta.file_hashes.is_empty() => meta.file_hashes.into_iter().collect(),
-            _ => graph
-                .files
-                .iter()
-                .map(|(p, f)| (p.clone(), f.hash.clone()))
-                .collect(),
-        };
+    let old_hashes: HashMap<String, String> = match crate::graph::load_meta(&codemap_dir) {
+        Ok(meta) if !meta.file_hashes.is_empty() => meta.file_hashes.into_iter().collect(),
+        _ => graph
+            .files
+            .iter()
+            .map(|(p, f)| (p.clone(), f.hash.clone()))
+            .collect(),
+    };
 
     // 检测变更
     let changes = crate::differ::detect_changed_files(&old_hashes, &new_hashes);
@@ -113,7 +112,10 @@ pub fn run(args: UpdateArgs) {
 
         let mut ts_parser = tree_sitter::Parser::new();
         if ts_parser.set_language(&adapter.language()).is_err() {
-            eprintln!("Warning: failed to set language for {:?}, skipping", abs_path);
+            eprintln!(
+                "Warning: failed to set language for {:?}, skipping",
+                abs_path
+            );
             continue;
         }
         let tree = match ts_parser.parse(content, None) {
@@ -136,19 +138,24 @@ pub fn run(args: UpdateArgs) {
         let variables = crate::scanner::convert_variables(&lang_variables);
 
         // 构建 symbol_refs（与 scan_project 一致）
-        let imported_symbols: std::collections::HashSet<String> = imports.iter()
+        let imported_symbols: std::collections::HashSet<String> = imports
+            .iter()
             .flat_map(|imp| imp.symbols.iter().cloned())
             .collect();
         let symbol_uses = crate::scanner::scan_symbol_uses(&tree, content, &imported_symbols);
-        let mut symbol_refs: std::collections::BTreeMap<String, crate::graph::SymbolRef> = std::collections::BTreeMap::new();
+        let mut symbol_refs: std::collections::BTreeMap<String, crate::graph::SymbolRef> =
+            std::collections::BTreeMap::new();
         for imp in &imports {
             for sym in &imp.symbols {
                 let use_lines = symbol_uses.get(sym).cloned().unwrap_or_default();
-                symbol_refs.insert(sym.clone(), crate::graph::SymbolRef {
-                    symbol: sym.clone(),
-                    import_line: imp.import_line,
-                    use_lines,
-                });
+                symbol_refs.insert(
+                    sym.clone(),
+                    crate::graph::SymbolRef {
+                        symbol: sym.clone(),
+                        import_line: imp.import_line,
+                        use_lines,
+                    },
+                );
             }
         }
 

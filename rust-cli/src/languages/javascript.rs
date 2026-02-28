@@ -1,8 +1,8 @@
-use tree_sitter::{Language, Tree};
 use super::{
-    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter, VariableInfo,
-    find_child_of_type, node_text, strip_quotes, walk_nodes,
+    find_child_of_type, node_text, strip_quotes, walk_nodes, ClassInfo, ExportInfo, FunctionInfo,
+    ImportInfo, LanguageAdapter, VariableInfo,
 };
+use tree_sitter::{Language, Tree};
 
 /// JavaScript 适配器（复用 TypeScript 逻辑，使用 JS grammar）
 pub struct JavaScriptAdapter;
@@ -30,10 +30,12 @@ impl LanguageAdapter for JavaScriptAdapter {
             if node.kind() == "function_declaration" {
                 if let Some(name_node) = node.child_by_field_name("name") {
                     let name = node_text(name_node, source).to_string();
-                    let params = node.child_by_field_name("parameters")
+                    let params = node
+                        .child_by_field_name("parameters")
                         .map(|p| extract_js_params(p, source))
                         .unwrap_or_default();
-                    let is_exported = node.parent()
+                    let is_exported = node
+                        .parent()
                         .map(|p| p.kind() == "export_statement")
                         .unwrap_or(false);
                     functions.push(FunctionInfo {
@@ -47,9 +49,10 @@ impl LanguageAdapter for JavaScriptAdapter {
             }
             // export const foo = (...) => {}
             if node.kind() == "lexical_declaration" {
-                let is_top = node.parent().map(|p| {
-                    p.kind() == "program" || p.kind() == "export_statement"
-                }).unwrap_or(false);
+                let is_top = node
+                    .parent()
+                    .map(|p| p.kind() == "program" || p.kind() == "export_statement")
+                    .unwrap_or(false);
                 if is_top {
                     let mut cursor = node.walk();
                     for child in node.children(&mut cursor) {
@@ -58,10 +61,12 @@ impl LanguageAdapter for JavaScriptAdapter {
                                 if val.kind() == "arrow_function" {
                                     if let Some(name_node) = child.child_by_field_name("name") {
                                         let name = node_text(name_node, source).to_string();
-                                        let params = val.child_by_field_name("parameters")
+                                        let params = val
+                                            .child_by_field_name("parameters")
                                             .map(|p| extract_js_params(p, source))
                                             .unwrap_or_default();
-                                        let is_exported = node.parent()
+                                        let is_exported = node
+                                            .parent()
                                             .map(|p| p.kind() == "export_statement")
                                             .unwrap_or(false);
                                         functions.push(FunctionInfo {
@@ -88,7 +93,8 @@ impl LanguageAdapter for JavaScriptAdapter {
             if node.kind() != "import_statement" {
                 return;
             }
-            let src_node = node.child_by_field_name("source")
+            let src_node = node
+                .child_by_field_name("source")
                 .or_else(|| find_child_of_type(node, "string"));
             let src = match src_node {
                 Some(n) => strip_quotes(node_text(n, source)),
@@ -100,7 +106,8 @@ impl LanguageAdapter for JavaScriptAdapter {
                     let mut c = named.walk();
                     for spec in named.children(&mut c) {
                         if spec.kind() == "import_specifier" {
-                            let n = spec.child_by_field_name("name")
+                            let n = spec
+                                .child_by_field_name("name")
                                 .or_else(|| spec.named_child(0));
                             if let Some(n) = n {
                                 names.push(node_text(n, source).to_string());
@@ -115,7 +122,12 @@ impl LanguageAdapter for JavaScriptAdapter {
                     }
                 }
             }
-            imports.push(ImportInfo { source: src, names, is_default: false, line: node.start_position().row + 1 });
+            imports.push(ImportInfo {
+                source: src,
+                names,
+                is_default: false,
+                line: node.start_position().row + 1,
+            });
         });
         imports
     }
@@ -128,12 +140,18 @@ impl LanguageAdapter for JavaScriptAdapter {
             }
             if let Some(func) = find_child_of_type(node, "function_declaration") {
                 if let Some(n) = func.child_by_field_name("name") {
-                    exports.push(ExportInfo { name: node_text(n, source).to_string(), kind: "function".into() });
+                    exports.push(ExportInfo {
+                        name: node_text(n, source).to_string(),
+                        kind: "function".into(),
+                    });
                 }
             }
             if let Some(cls) = find_child_of_type(node, "class_declaration") {
                 if let Some(n) = cls.child_by_field_name("name") {
-                    exports.push(ExportInfo { name: node_text(n, source).to_string(), kind: "class".into() });
+                    exports.push(ExportInfo {
+                        name: node_text(n, source).to_string(),
+                        kind: "class".into(),
+                    });
                 }
             }
             if let Some(lex) = find_child_of_type(node, "lexical_declaration") {
@@ -141,7 +159,10 @@ impl LanguageAdapter for JavaScriptAdapter {
                 for decl in lex.children(&mut c) {
                     if decl.kind() == "variable_declarator" {
                         if let Some(n) = decl.child_by_field_name("name") {
-                            exports.push(ExportInfo { name: node_text(n, source).to_string(), kind: "variable".into() });
+                            exports.push(ExportInfo {
+                                name: node_text(n, source).to_string(),
+                                kind: "variable".into(),
+                            });
                         }
                     }
                 }
@@ -150,10 +171,14 @@ impl LanguageAdapter for JavaScriptAdapter {
                 let mut c = clause.walk();
                 for spec in clause.children(&mut c) {
                     if spec.kind() == "export_specifier" {
-                        let n = spec.child_by_field_name("name")
+                        let n = spec
+                            .child_by_field_name("name")
                             .or_else(|| spec.named_child(0));
                         if let Some(n) = n {
-                            exports.push(ExportInfo { name: node_text(n, source).to_string(), kind: "variable".into() });
+                            exports.push(ExportInfo {
+                                name: node_text(n, source).to_string(),
+                                kind: "variable".into(),
+                            });
                         }
                     }
                 }
@@ -251,7 +276,8 @@ fn extract_js_params(params_node: tree_sitter::Node, source: &[u8]) -> Vec<Strin
     if inner.trim().is_empty() {
         return Vec::new();
     }
-    inner.split(',')
+    inner
+        .split(',')
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
         .collect()

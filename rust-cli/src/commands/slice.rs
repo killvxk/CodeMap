@@ -67,8 +67,7 @@ pub fn run(args: SliceArgs) {
             } else {
                 match graph.modules.get(&mod_name) {
                     Some(mod_data) => {
-                        let slice =
-                            crate::slicer::build_module_slice(&graph, &mod_name, mod_data);
+                        let slice = crate::slicer::build_module_slice(&graph, &mod_name, mod_data);
                         match serde_json::to_string_pretty(&slice) {
                             Ok(json) => println!("{}", json),
                             Err(e) => {

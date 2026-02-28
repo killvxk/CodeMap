@@ -67,7 +67,10 @@ mod tests {
 
     #[test]
     fn test_posix_normalize() {
-        assert_eq!(posix_normalize("src/auth/../utils/helper"), "src/utils/helper");
+        assert_eq!(
+            posix_normalize("src/auth/../utils/helper"),
+            "src/utils/helper"
+        );
         assert_eq!(posix_normalize("src/./auth/login"), "src/auth/login");
         assert_eq!(posix_normalize("a/b/c"), "a/b/c");
     }

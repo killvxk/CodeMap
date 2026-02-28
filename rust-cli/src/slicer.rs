@@ -137,7 +137,11 @@ pub fn generate_slices(graph: &CodeGraph) -> std::collections::HashMap<String, M
 }
 
 /// 构建单个模块的完整切片
-pub fn build_module_slice(graph: &CodeGraph, mod_name: &str, mod_data: &ModuleEntry) -> ModuleSlice {
+pub fn build_module_slice(
+    graph: &CodeGraph,
+    mod_name: &str,
+    mod_data: &ModuleEntry,
+) -> ModuleSlice {
     let mut files: Vec<SliceFile> = Vec::new();
     let mut all_exports: Vec<String> = Vec::new();
     let mut total_functions = 0u32;
@@ -227,7 +231,10 @@ pub fn get_module_slice_with_deps(
         })
         .collect();
 
-    Ok(ModuleSliceWithDeps { slice, dependencies })
+    Ok(ModuleSliceWithDeps {
+        slice,
+        dependencies,
+    })
 }
 
 /// 保存 overview 和各模块切片到 {output_dir}/slices/
@@ -255,10 +262,7 @@ pub fn save_slices(output_dir: &Path, graph: &CodeGraph) -> anyhow::Result<()> {
 
 // ── 内部工具函数 ──────────────────────────────────────────────────────────────
 
-fn collect_module_stats(
-    graph: &CodeGraph,
-    mod_data: &ModuleEntry,
-) -> (Vec<String>, ModuleStats) {
+fn collect_module_stats(graph: &CodeGraph, mod_data: &ModuleEntry) -> (Vec<String>, ModuleStats) {
     let mut all_exports: Vec<String> = Vec::new();
     let mut total_functions = 0u32;
     let mut total_classes = 0u32;

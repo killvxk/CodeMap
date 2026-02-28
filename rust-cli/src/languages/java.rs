@@ -1,8 +1,8 @@
-use tree_sitter::{Language, Tree};
 use super::{
-    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter, VariableInfo,
-    node_text, walk_nodes,
+    node_text, walk_nodes, ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter,
+    VariableInfo,
 };
+use tree_sitter::{Language, Tree};
 
 pub struct JavaAdapter;
 
@@ -38,7 +38,8 @@ impl LanguageAdapter for JavaAdapter {
                 Some(c) => format!("{}.{}", c, node_text(name_node, source)),
                 None => node_text(name_node, source).to_string(),
             };
-            let params = node.child_by_field_name("parameters")
+            let params = node
+                .child_by_field_name("parameters")
                 .map(|p| extract_java_params(p, source))
                 .unwrap_or_default();
             let is_exported = has_modifier(node, source, "public");
@@ -143,7 +144,11 @@ impl LanguageAdapter for JavaAdapter {
             if !has_modifier(node, source, "static") {
                 return;
             }
-            let kind = if has_modifier(node, source, "final") { "const" } else { "static" };
+            let kind = if has_modifier(node, source, "final") {
+                "const"
+            } else {
+                "static"
+            };
             let is_exported = has_modifier(node, source, "public");
             // 遍历 variable_declarator 子节点
             let mut cursor = node.walk();
@@ -243,8 +248,12 @@ public class Greeter {
         let tree = parse(src);
         let adapter = JavaAdapter::new();
         let fns = adapter.extract_functions(&tree, src.as_bytes());
-        assert!(fns.iter().any(|f| f.name == "Greeter.greet" && f.is_exported));
-        assert!(fns.iter().any(|f| f.name == "Greeter.helper" && !f.is_exported));
+        assert!(fns
+            .iter()
+            .any(|f| f.name == "Greeter.greet" && f.is_exported));
+        assert!(fns
+            .iter()
+            .any(|f| f.name == "Greeter.helper" && !f.is_exported));
     }
 
     #[test]
@@ -253,7 +262,9 @@ public class Greeter {
         let tree = parse(src);
         let adapter = JavaAdapter::new();
         let imports = adapter.extract_imports(&tree, src.as_bytes());
-        assert!(imports.iter().any(|i| i.source == "java.util" && i.names.contains(&"List".to_string())));
+        assert!(imports
+            .iter()
+            .any(|i| i.source == "java.util" && i.names.contains(&"List".to_string())));
     }
 
     #[test]
@@ -267,8 +278,12 @@ public interface Runnable {}
         let tree = parse(src);
         let adapter = JavaAdapter::new();
         let classes = adapter.extract_classes(&tree, src.as_bytes());
-        assert!(classes.iter().any(|c| c.name == "Animal" && c.kind == "class"));
-        assert!(classes.iter().any(|c| c.name == "Runnable" && c.kind == "interface"));
+        assert!(classes
+            .iter()
+            .any(|c| c.name == "Animal" && c.kind == "class"));
+        assert!(classes
+            .iter()
+            .any(|c| c.name == "Runnable" && c.kind == "interface"));
     }
 
     #[test]
@@ -283,8 +298,12 @@ public class Config {
         let tree = parse(src);
         let adapter = JavaAdapter::new();
         let vars = adapter.extract_variables(&tree, src.as_bytes());
-        assert!(vars.iter().any(|v| v.name == "MAX_SIZE" && v.kind == "const" && v.is_exported));
-        assert!(vars.iter().any(|v| v.name == "prefix" && v.kind == "static" && !v.is_exported));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "MAX_SIZE" && v.kind == "const" && v.is_exported));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "prefix" && v.kind == "static" && !v.is_exported));
         // instanceField 没有 static，不应出现
         assert!(!vars.iter().any(|v| v.name == "instanceField"));
     }

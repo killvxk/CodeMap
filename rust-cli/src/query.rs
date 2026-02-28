@@ -22,7 +22,7 @@ pub struct CallerRef {
 
 #[derive(Debug, Clone)]
 pub struct SymbolResult {
-    pub kind: String,       // "function" | "class" | "type" | "variable"
+    pub kind: String, // "function" | "class" | "type" | "variable"
     pub name: String,
     pub signature: Option<String>,
     pub file: String,
@@ -57,7 +57,11 @@ pub struct QueryOptions {
 /// 在图谱中搜索匹配的符号（函数、类、类型）。
 ///
 /// 匹配规则：符号名称等于 symbol_name，或包含 symbol_name（子串匹配）。
-pub fn query_symbol(graph: &CodeGraph, symbol_name: &str, opts: &QueryOptions) -> Vec<SymbolResult> {
+pub fn query_symbol(
+    graph: &CodeGraph,
+    symbol_name: &str,
+    opts: &QueryOptions,
+) -> Vec<SymbolResult> {
     let mut results = Vec::new();
     let type_filter = opts.type_filter.as_deref();
 
@@ -67,14 +71,18 @@ pub fn query_symbol(graph: &CodeGraph, symbol_name: &str, opts: &QueryOptions) -
             for func in &file_data.functions {
                 if matches_symbol(&func.name, symbol_name) {
                     let file_imports = collect_file_imports(file_data, &func.name);
-                    let (imported_by, imported_by_refs) = find_callers(graph, file_path, &func.name);
+                    let (imported_by, imported_by_refs) =
+                        find_callers(graph, file_path, &func.name);
                     results.push(SymbolResult {
                         kind: "function".into(),
                         name: func.name.clone(),
                         signature: Some(func.signature.clone()),
                         file: file_path.clone(),
                         module: file_data.module.clone(),
-                        lines: LineRange { start: func.start_line, end: func.end_line },
+                        lines: LineRange {
+                            start: func.start_line,
+                            end: func.end_line,
+                        },
                         file_imports,
                         imported_by,
                         imported_by_refs,
@@ -94,7 +102,10 @@ pub fn query_symbol(graph: &CodeGraph, symbol_name: &str, opts: &QueryOptions) -
                         signature: None,
                         file: file_path.clone(),
                         module: file_data.module.clone(),
-                        lines: LineRange { start: cls.start_line, end: cls.end_line },
+                        lines: LineRange {
+                            start: cls.start_line,
+                            end: cls.end_line,
+                        },
                         file_imports: vec![],
                         imported_by,
                         imported_by_refs,
@@ -114,7 +125,10 @@ pub fn query_symbol(graph: &CodeGraph, symbol_name: &str, opts: &QueryOptions) -
                         signature: None,
                         file: file_path.clone(),
                         module: file_data.module.clone(),
-                        lines: LineRange { start: tp.start_line, end: tp.end_line },
+                        lines: LineRange {
+                            start: tp.start_line,
+                            end: tp.end_line,
+                        },
                         file_imports: vec![],
                         imported_by,
                         imported_by_refs,
@@ -134,7 +148,10 @@ pub fn query_symbol(graph: &CodeGraph, symbol_name: &str, opts: &QueryOptions) -
                         signature: Some(format!("{} {}", var.kind, var.name)),
                         file: file_path.clone(),
                         module: file_data.module.clone(),
-                        lines: LineRange { start: var.start_line, end: var.start_line },
+                        lines: LineRange {
+                            start: var.start_line,
+                            end: var.start_line,
+                        },
                         file_imports: vec![],
                         imported_by,
                         imported_by_refs,
@@ -162,14 +179,18 @@ pub fn query_module(graph: &CodeGraph, module_name: &str) -> Option<ModuleResult
 
 /// 返回依赖该模块的模块列表。
 pub fn query_dependants(graph: &CodeGraph, module_name: &str) -> Vec<String> {
-    graph.modules.get(module_name)
+    graph
+        .modules
+        .get(module_name)
         .map(|m| m.depended_by.clone())
         .unwrap_or_default()
 }
 
 /// 返回该模块依赖的模块列表。
 pub fn query_dependencies(graph: &CodeGraph, module_name: &str) -> Vec<String> {
-    graph.modules.get(module_name)
+    graph
+        .modules
+        .get(module_name)
         .map(|m| m.depends_on.clone())
         .unwrap_or_default()
 }
@@ -183,7 +204,8 @@ fn matches_symbol(name: &str, query: &str) -> bool {
 
 /// 收集同文件中导入的符号（排除自身）
 fn collect_file_imports(file_data: &FileEntry, self_name: &str) -> Vec<String> {
-    file_data.imports
+    file_data
+        .imports
         .iter()
         .flat_map(|imp| imp.symbols.iter())
         .filter(|s| s.as_str() != self_name)
@@ -193,11 +215,26 @@ fn collect_file_imports(file_data: &FileEntry, self_name: &str) -> Vec<String> {
 
 /// 查找导入了指定符号的其他文件
 /// 返回 (旧格式 "module:file" 列表, 新格式 CallerRef 列表)
-fn find_callers(graph: &CodeGraph, source_file: &str, symbol_name: &str) -> (Vec<String>, Vec<CallerRef>) {
+fn find_callers(
+    graph: &CodeGraph,
+    source_file: &str,
+    symbol_name: &str,
+) -> (Vec<String>, Vec<CallerRef>) {
     let mut callers = Vec::new();
     let mut caller_refs = Vec::new();
     for (file_path, file_data) in &graph.files {
         if file_path == source_file {
+            // 检查同文件内的使用（import_line == 0 表示本地定义的符号）
+            if let Some(sym_ref) = file_data.symbol_refs.get(symbol_name) {
+                if sym_ref.import_line == 0 && !sym_ref.use_lines.is_empty() {
+                    caller_refs.push(CallerRef {
+                        file: file_path.clone(),
+                        module: file_data.module.clone(),
+                        import_line: 0,
+                        use_lines: sym_ref.use_lines.clone(),
+                    });
+                }
+            }
             continue;
         }
         // 检查 symbol_refs（行号级）
@@ -250,20 +287,38 @@ pub fn format_symbol_results(results: &[SymbolResult]) -> String {
         }
         out.push_str(&format!("  module:    {}\n", r.module));
         out.push_str(&format!("  lines:     {}-{}\n", r.lines.start, r.lines.end));
-        if !r.imported_by.is_empty() {
-            if !r.imported_by_refs.is_empty() && r.imported_by_refs.iter().any(|c| c.import_line > 0) {
-                out.push_str("  importedBy:\n");
-                for cr in &r.imported_by_refs {
-                    let mut parts = vec![format!("{}:{}", cr.file, cr.import_line)];
-                    if !cr.use_lines.is_empty() {
-                        let uses: Vec<String> = cr.use_lines.iter().map(|l| format!(":{}", l)).collect();
-                        parts.push(format!("(use {})", uses.join(" ")));
-                    }
-                    out.push_str(&format!("    {}\n", parts.join(" ")));
-                }
-            } else {
-                out.push_str(&format!("  importedBy: {}\n", r.imported_by.join(", ")));
+        // 同文件使用引用（import_line == 0）
+        let local_refs: Vec<&CallerRef> = r
+            .imported_by_refs
+            .iter()
+            .filter(|c| c.import_line == 0)
+            .collect();
+        if !local_refs.is_empty() {
+            out.push_str("  usedAt:\n");
+            for cr in &local_refs {
+                let uses: Vec<String> = cr.use_lines.iter().map(|l| format!(":{}", l)).collect();
+                out.push_str(&format!("    {} {}\n", cr.file, uses.join(" ")));
             }
+        }
+        // 跨文件导入引用（import_line > 0）
+        let cross_refs: Vec<&CallerRef> = r
+            .imported_by_refs
+            .iter()
+            .filter(|c| c.import_line > 0)
+            .collect();
+        if !cross_refs.is_empty() {
+            out.push_str("  importedBy:\n");
+            for cr in &cross_refs {
+                let mut parts = vec![format!("{}:{}", cr.file, cr.import_line)];
+                if !cr.use_lines.is_empty() {
+                    let uses: Vec<String> =
+                        cr.use_lines.iter().map(|l| format!(":{}", l)).collect();
+                    parts.push(format!("(use {})", uses.join(" ")));
+                }
+                out.push_str(&format!("    {}\n", parts.join(" ")));
+            }
+        } else if !r.imported_by.is_empty() {
+            out.push_str(&format!("  importedBy: {}\n", r.imported_by.join(", ")));
         }
         out.push('\n');
     }
@@ -281,7 +336,10 @@ pub fn format_module_result(result: &ModuleResult) -> String {
         out.push_str(&format!("  dependsOn: {}\n", result.depends_on.join(", ")));
     }
     if !result.depended_by.is_empty() {
-        out.push_str(&format!("  dependedBy: {}\n", result.depended_by.join(", ")));
+        out.push_str(&format!(
+            "  dependedBy: {}\n",
+            result.depended_by.join(", ")
+        ));
     }
     out.trim_end().to_string()
 }
@@ -292,8 +350,8 @@ pub fn format_module_result(result: &ModuleResult) -> String {
 mod tests {
     use super::*;
     use crate::graph::{
-        ClassInfo, CodeGraph, FileEntry, FunctionInfo, GraphConfig, GraphSummary,
-        ImportInfo, ModuleEntry, ProjectInfo, TypeInfo, VariableInfo,
+        ClassInfo, CodeGraph, FileEntry, FunctionInfo, GraphConfig, GraphSummary, ImportInfo,
+        ModuleEntry, ProjectInfo, TypeInfo, VariableInfo,
     };
     use std::collections::HashMap;
 
@@ -395,10 +453,16 @@ mod tests {
 
         CodeGraph {
             version: "1.0".into(),
-            project: ProjectInfo { name: "test".into(), root: "/test".into() },
+            project: ProjectInfo {
+                name: "test".into(),
+                root: "/test".into(),
+            },
             scanned_at: "2026-01-01T00:00:00.000Z".into(),
             commit_hash: None,
-            config: GraphConfig { languages: vec![], exclude_patterns: vec![] },
+            config: GraphConfig {
+                languages: vec![],
+                exclude_patterns: vec![],
+            },
             summary: GraphSummary {
                 total_files: 2,
                 total_functions: 3,
@@ -438,7 +502,9 @@ mod tests {
     #[test]
     fn test_query_type_filter_function() {
         let graph = make_graph();
-        let opts = QueryOptions { type_filter: Some("function".into()) };
+        let opts = QueryOptions {
+            type_filter: Some("function".into()),
+        };
         let results = query_symbol(&graph, "Auth", &opts);
         // "AuthService" 是 class，过滤后不应出现
         assert!(results.is_empty());
@@ -447,7 +513,9 @@ mod tests {
     #[test]
     fn test_query_type_filter_class() {
         let graph = make_graph();
-        let opts = QueryOptions { type_filter: Some("class".into()) };
+        let opts = QueryOptions {
+            type_filter: Some("class".into()),
+        };
         let results = query_symbol(&graph, "Auth", &opts);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "AuthService");
@@ -457,7 +525,9 @@ mod tests {
     #[test]
     fn test_query_type_filter_type() {
         let graph = make_graph();
-        let opts = QueryOptions { type_filter: Some("type".into()) };
+        let opts = QueryOptions {
+            type_filter: Some("type".into()),
+        };
         let results = query_symbol(&graph, "Token", &opts);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "UserToken");
@@ -506,7 +576,9 @@ mod tests {
     #[test]
     fn test_query_type_filter_variable() {
         let graph = make_graph();
-        let opts = QueryOptions { type_filter: Some("variable".into()) };
+        let opts = QueryOptions {
+            type_filter: Some("variable".into()),
+        };
         let results = query_symbol(&graph, "MAX_RETRIES", &opts);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "MAX_RETRIES");
@@ -527,7 +599,9 @@ mod tests {
     #[test]
     fn test_query_variable_excluded_by_function_filter() {
         let graph = make_graph();
-        let opts = QueryOptions { type_filter: Some("function".into()) };
+        let opts = QueryOptions {
+            type_filter: Some("function".into()),
+        };
         let results = query_symbol(&graph, "MAX_RETRIES", &opts);
         assert!(results.is_empty());
     }
@@ -553,5 +627,27 @@ mod tests {
         assert!(out.contains("[function]"));
         assert!(out.contains("login"));
         assert!(out.contains("auth/login.ts"));
+    }
+
+    #[test]
+    fn test_query_variable_same_file_usage() {
+        let mut graph = make_graph();
+        // 为 MAX_RETRIES 添加同文件使用记录（import_line = 0 表示本地定义）
+        if let Some(file) = graph.files.get_mut("auth/login.ts") {
+            file.symbol_refs.insert(
+                "MAX_RETRIES".to_string(),
+                crate::graph::SymbolRef {
+                    symbol: "MAX_RETRIES".to_string(),
+                    import_line: 0,
+                    use_lines: vec![10, 15],
+                },
+            );
+        }
+        let results = query_symbol(&graph, "MAX_RETRIES", &QueryOptions::default());
+        assert_eq!(results.len(), 1);
+        // 应该有同文件使用的引用
+        assert!(!results[0].imported_by_refs.is_empty());
+        assert_eq!(results[0].imported_by_refs[0].import_line, 0);
+        assert_eq!(results[0].imported_by_refs[0].use_lines, vec![10, 15]);
     }
 }

@@ -5,8 +5,7 @@
 use codegraph::scanner::scan_project;
 use std::path::Path;
 
-const FIXTURE_DIR: &str =
-    "E:/2026/CodeMap/ccplugin/cli/test/fixtures/sample-project";
+const FIXTURE_DIR: &str = "E:/2026/CodeMap/ccplugin/cli/test/fixtures/sample-project";
 
 fn fixture() -> codegraph::graph::CodeGraph {
     scan_project(Path::new(FIXTURE_DIR), &[]).expect("scan_project failed")
@@ -38,7 +37,10 @@ fn test_scan_languages_include_typescript() {
 #[test]
 fn test_scan_language_counts() {
     let g = fixture();
-    assert_eq!(g.summary.languages.get("typescript").copied().unwrap_or(0), 2);
+    assert_eq!(
+        g.summary.languages.get("typescript").copied().unwrap_or(0),
+        2
+    );
     assert_eq!(g.summary.languages.get("rust").copied().unwrap_or(0), 1);
     assert_eq!(g.summary.languages.get("java").copied().unwrap_or(0), 1);
     assert_eq!(g.summary.languages.get("cpp").copied().unwrap_or(0), 1);
@@ -52,8 +54,14 @@ fn test_scan_language_counts() {
 fn test_scan_modules_detected() {
     let g = fixture();
     let mods = &g.summary.modules;
-    for expected in &["api", "auth", "core", "models", "native", "services", "utils"] {
-        assert!(mods.contains(&expected.to_string()), "missing module '{}'", expected);
+    for expected in &[
+        "api", "auth", "core", "models", "native", "services", "utils",
+    ] {
+        assert!(
+            mods.contains(&expected.to_string()),
+            "missing module '{}'",
+            expected
+        );
     }
 }
 
@@ -93,7 +101,10 @@ fn test_scan_login_ts_has_imports() {
 fn test_scan_login_ts_exports_login() {
     let g = fixture();
     let f = &g.files["src/auth/login.ts"];
-    assert!(f.exports.contains(&"login".to_string()), "login.ts should export 'login'");
+    assert!(
+        f.exports.contains(&"login".to_string()),
+        "login.ts should export 'login'"
+    );
 }
 
 // ── 模块依赖图（对应 "should build module dependency graph"）
@@ -153,16 +164,18 @@ fn test_cross_validate_file_hashes() {
     let g = fixture();
     // 验证文件哈希与 Node.js meta.json 中的 fileHashes 一致
     let expected = [
-        ("src/api/routes.ts",      "sha256:45be6689959ab2de"),
-        ("src/auth/login.ts",      "sha256:8b6c5eca0e26a23f"),
-        ("src/core/engine.rs",     "sha256:5ab3dc4e622ea75f"),
-        ("src/models/User.java",   "sha256:6ba066e543f6f9a2"),
-        ("src/native/engine.cpp",  "sha256:7823bcaa1f7f3e5f"),
-        ("src/services/handler.go","sha256:094e3fb44dd7fe3b"),
-        ("src/utils/helpers.py",   "sha256:b6769e7c6264de45"),
+        ("src/api/routes.ts", "sha256:45be6689959ab2de"),
+        ("src/auth/login.ts", "sha256:8b6c5eca0e26a23f"),
+        ("src/core/engine.rs", "sha256:5ab3dc4e622ea75f"),
+        ("src/models/User.java", "sha256:6ba066e543f6f9a2"),
+        ("src/native/engine.cpp", "sha256:7823bcaa1f7f3e5f"),
+        ("src/services/handler.go", "sha256:094e3fb44dd7fe3b"),
+        ("src/utils/helpers.py", "sha256:b6769e7c6264de45"),
     ];
     for (path, hash) in &expected {
-        let file = g.files.get(*path)
+        let file = g
+            .files
+            .get(*path)
             .unwrap_or_else(|| panic!("file '{}' not found in graph", path));
         assert_eq!(
             file.hash, *hash,

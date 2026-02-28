@@ -55,7 +55,12 @@ pub fn detect_changed_files(
     removed.sort();
     unchanged.sort();
 
-    ChangeSet { added, modified, removed, unchanged }
+    ChangeSet {
+        added,
+        modified,
+        removed,
+        unchanged,
+    }
 }
 
 /// 将变更合并到现有图谱（原地修改）
@@ -91,11 +96,14 @@ pub fn merge_graph_update(
         }
 
         // 确保目标模块存在
-        graph.modules.entry(file_data.module.clone()).or_insert_with(|| ModuleEntry {
-            files: vec![],
-            depends_on: vec![],
-            depended_by: vec![],
-        });
+        graph
+            .modules
+            .entry(file_data.module.clone())
+            .or_insert_with(|| ModuleEntry {
+                files: vec![],
+                depends_on: vec![],
+                depended_by: vec![],
+            });
 
         // 将文件加入模块（避免重复，用 HashSet 检查）
         let mod_name = file_data.module.clone();
@@ -167,7 +175,9 @@ fn rebuild_dependencies(graph: &mut CodeGraph) {
         path_lookup.insert(norm.clone(), file_data.module.clone());
         // 无扩展名版本
         let without_ext = strip_extension(&norm);
-        path_lookup.entry(without_ext).or_insert_with(|| file_data.module.clone());
+        path_lookup
+            .entry(without_ext)
+            .or_insert_with(|| file_data.module.clone());
     }
 
     // 用 Set 收集依赖关系
@@ -211,13 +221,17 @@ fn rebuild_dependencies(graph: &mut CodeGraph) {
 
     // 写回图谱
     for (mod_name, module) in &mut graph.modules {
-        let mut dep_on: Vec<String> =
-            depends_on.get(mod_name).map(|s| s.iter().cloned().collect()).unwrap_or_default();
+        let mut dep_on: Vec<String> = depends_on
+            .get(mod_name)
+            .map(|s| s.iter().cloned().collect())
+            .unwrap_or_default();
         dep_on.sort();
         module.depends_on = dep_on;
 
-        let mut dep_by: Vec<String> =
-            depended_by.get(mod_name).map(|s| s.iter().cloned().collect()).unwrap_or_default();
+        let mut dep_by: Vec<String> = depended_by
+            .get(mod_name)
+            .map(|s| s.iter().cloned().collect())
+            .unwrap_or_default();
         dep_by.sort();
         module.depended_by = dep_by;
     }
@@ -320,7 +334,9 @@ mod tests {
     #[test]
     fn test_merge_remove_file() {
         let mut graph = create_empty_graph("test", "/tmp/test");
-        graph.files.insert("src/a.ts".to_string(), make_file_entry("auth"));
+        graph
+            .files
+            .insert("src/a.ts".to_string(), make_file_entry("auth"));
         graph.modules.insert(
             "auth".to_string(),
             ModuleEntry {
@@ -357,7 +373,9 @@ mod tests {
     #[test]
     fn test_merge_module_change() {
         let mut graph = create_empty_graph("test", "/tmp/test");
-        graph.files.insert("src/a.ts".to_string(), make_file_entry("old_mod"));
+        graph
+            .files
+            .insert("src/a.ts".to_string(), make_file_entry("old_mod"));
         graph.modules.insert(
             "old_mod".to_string(),
             ModuleEntry {
@@ -391,10 +409,14 @@ mod tests {
             is_external: false,
             import_line: 0,
         }];
-        graph.files.insert("src/auth/login.ts".to_string(), auth_file);
+        graph
+            .files
+            .insert("src/auth/login.ts".to_string(), auth_file);
 
         let utils_file = make_file_entry("utils");
-        graph.files.insert("src/utils/helper.ts".to_string(), utils_file);
+        graph
+            .files
+            .insert("src/utils/helper.ts".to_string(), utils_file);
 
         graph.modules.insert(
             "auth".to_string(),

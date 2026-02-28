@@ -1,8 +1,8 @@
-use tree_sitter::{Language, Tree};
 use super::{
-    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter, VariableInfo,
-    find_descendant_of_type, node_text, walk_nodes,
+    find_descendant_of_type, node_text, walk_nodes, ClassInfo, ExportInfo, FunctionInfo,
+    ImportInfo, LanguageAdapter, VariableInfo,
 };
+use tree_sitter::{Language, Tree};
 
 pub struct CAdapter;
 
@@ -64,7 +64,8 @@ pub fn extract_c_functions(tree: &Tree, source: &[u8]) -> Vec<FunctionInfo> {
         };
         let name = node_text(name_node, source).to_string();
         let is_static = has_storage_class_static(node, source);
-        let params = func_decl.child_by_field_name("parameters")
+        let params = func_decl
+            .child_by_field_name("parameters")
             .map(|p| extract_c_params(p, source))
             .unwrap_or_default();
         functions.push(FunctionInfo {
@@ -117,7 +118,10 @@ pub fn extract_c_exports(tree: &Tree, source: &[u8]) -> Vec<ExportInfo> {
                     if let Some(name_node) = func_decl.child_by_field_name("declarator") {
                         let name = bare_identifier(node_text(name_node, source));
                         if seen.insert(name.clone()) {
-                            exports.push(ExportInfo { name, kind: "function".into() });
+                            exports.push(ExportInfo {
+                                name,
+                                kind: "function".into(),
+                            });
                         }
                     }
                 }
@@ -129,7 +133,10 @@ pub fn extract_c_exports(tree: &Tree, source: &[u8]) -> Vec<ExportInfo> {
                 if let Some(n) = node.child_by_field_name("name") {
                     let name = node_text(n, source).to_string();
                     if seen.insert(name.clone()) {
-                        exports.push(ExportInfo { name, kind: "struct".into() });
+                        exports.push(ExportInfo {
+                            name,
+                            kind: "struct".into(),
+                        });
                     }
                 }
             }
@@ -137,7 +144,10 @@ pub fn extract_c_exports(tree: &Tree, source: &[u8]) -> Vec<ExportInfo> {
                 if let Some(n) = node.child_by_field_name("name") {
                     let name = node_text(n, source).to_string();
                     if seen.insert(name.clone()) {
-                        exports.push(ExportInfo { name, kind: "enum".into() });
+                        exports.push(ExportInfo {
+                            name,
+                            kind: "enum".into(),
+                        });
                     }
                 }
             }
@@ -145,7 +155,10 @@ pub fn extract_c_exports(tree: &Tree, source: &[u8]) -> Vec<ExportInfo> {
                 if let Some(n) = find_descendant_of_type(node, "type_identifier") {
                     let name = node_text(n, source).to_string();
                     if seen.insert(name.clone()) {
-                        exports.push(ExportInfo { name, kind: "typedef".into() });
+                        exports.push(ExportInfo {
+                            name,
+                            kind: "typedef".into(),
+                        });
                     }
                 }
             }
@@ -157,25 +170,27 @@ pub fn extract_c_exports(tree: &Tree, source: &[u8]) -> Vec<ExportInfo> {
 
 pub fn extract_c_classes(tree: &Tree, source: &[u8]) -> Vec<ClassInfo> {
     let mut classes = Vec::new();
-    walk_nodes(tree.root_node(), &mut |node| {
-        match node.kind() {
-            "struct_specifier" | "class_specifier" => {
-                if node.child_by_field_name("body").is_none() {
-                    return;
-                }
-                if let Some(n) = node.child_by_field_name("name") {
-                    let kind = if node.kind() == "class_specifier" { "class" } else { "struct" };
-                    classes.push(ClassInfo {
-                        name: node_text(n, source).to_string(),
-                        start_line: node.start_position().row + 1,
-                        end_line: node.end_position().row + 1,
-                        methods: Vec::new(),
-                        kind: kind.into(),
-                    });
-                }
+    walk_nodes(tree.root_node(), &mut |node| match node.kind() {
+        "struct_specifier" | "class_specifier" => {
+            if node.child_by_field_name("body").is_none() {
+                return;
             }
-            _ => {}
+            if let Some(n) = node.child_by_field_name("name") {
+                let kind = if node.kind() == "class_specifier" {
+                    "class"
+                } else {
+                    "struct"
+                };
+                classes.push(ClassInfo {
+                    name: node_text(n, source).to_string(),
+                    start_line: node.start_position().row + 1,
+                    end_line: node.end_position().row + 1,
+                    methods: Vec::new(),
+                    kind: kind.into(),
+                });
+            }
         }
+        _ => {}
     });
     classes
 }
@@ -334,8 +349,12 @@ static void helper() {}
         let tree = parse(src);
         let adapter = CAdapter::new();
         let imports = adapter.extract_imports(&tree, src.as_bytes());
-        assert!(imports.iter().any(|i| i.source == "stdio.h" && i.is_default));
-        assert!(imports.iter().any(|i| i.source == "mylib.h" && !i.is_default));
+        assert!(imports
+            .iter()
+            .any(|i| i.source == "stdio.h" && i.is_default));
+        assert!(imports
+            .iter()
+            .any(|i| i.source == "mylib.h" && !i.is_default));
     }
 
     #[test]
@@ -349,7 +368,9 @@ struct Point {
         let tree = parse(src);
         let adapter = CAdapter::new();
         let classes = adapter.extract_classes(&tree, src.as_bytes());
-        assert!(classes.iter().any(|c| c.name == "Point" && c.kind == "struct"));
+        assert!(classes
+            .iter()
+            .any(|c| c.name == "Point" && c.kind == "struct"));
     }
 
     #[test]
@@ -363,9 +384,15 @@ extern int sharedVal;
         let tree = parse(src);
         let adapter = CAdapter::new();
         let vars = adapter.extract_variables(&tree, src.as_bytes());
-        assert!(vars.iter().any(|v| v.name == "globalCount" && v.kind == "var" && v.is_exported));
-        assert!(vars.iter().any(|v| v.name == "MAX" && v.kind == "const" && v.is_exported));
-        assert!(vars.iter().any(|v| v.name == "internalVal" && v.kind == "var" && !v.is_exported));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "globalCount" && v.kind == "var" && v.is_exported));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "MAX" && v.kind == "const" && v.is_exported));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "internalVal" && v.kind == "var" && !v.is_exported));
         assert!(vars.iter().any(|v| v.name == "sharedVal" && v.is_exported));
     }
 }

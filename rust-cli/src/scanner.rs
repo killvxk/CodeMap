@@ -1,11 +1,13 @@
 use crate::graph::{
-    compute_file_hash, create_empty_graph, is_entry_point, save_graph, CodeGraph, FileEntry,
-    FunctionInfo as GraphFunctionInfo, ClassInfo as GraphClassInfo,
-    TypeInfo as GraphTypeInfo, ImportInfo as GraphImportInfo, ModuleEntry,
+    compute_file_hash, create_empty_graph, is_entry_point, save_graph, ClassInfo as GraphClassInfo,
+    CodeGraph, FileEntry, FunctionInfo as GraphFunctionInfo, ImportInfo as GraphImportInfo,
+    ModuleEntry, TypeInfo as GraphTypeInfo,
 };
 use crate::languages;
 use crate::path_utils::{normalize_path, strip_extension};
-use crate::traverser::{detect_language, effective_language, has_cpp_source_files, traverse_files, Language};
+use crate::traverser::{
+    detect_language, effective_language, has_cpp_source_files, traverse_files, Language,
+};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -14,33 +16,39 @@ use std::path::{Path, PathBuf};
 // ---------------------------------------------------------------------------
 
 pub fn convert_functions(lang_functions: &[languages::FunctionInfo]) -> Vec<GraphFunctionInfo> {
-    lang_functions.iter().map(|f| {
-        let sig = if f.params.is_empty() {
-            format!("{}()", f.name)
-        } else {
-            format!("{}({})", f.name, f.params.join(", "))
-        };
-        GraphFunctionInfo {
-            name: f.name.clone(),
-            signature: sig,
-            start_line: f.start_line as u32,
-            end_line: f.end_line as u32,
-        }
-    }).collect()
+    lang_functions
+        .iter()
+        .map(|f| {
+            let sig = if f.params.is_empty() {
+                format!("{}()", f.name)
+            } else {
+                format!("{}({})", f.name, f.params.join(", "))
+            };
+            GraphFunctionInfo {
+                name: f.name.clone(),
+                signature: sig,
+                start_line: f.start_line as u32,
+                end_line: f.end_line as u32,
+            }
+        })
+        .collect()
 }
 
 pub fn convert_classes(lang_classes: &[languages::ClassInfo]) -> Vec<GraphClassInfo> {
-    lang_classes.iter()
+    lang_classes
+        .iter()
         .filter(|c| matches!(c.kind.as_str(), "class" | "struct"))
         .map(|c| GraphClassInfo {
             name: c.name.clone(),
             start_line: c.start_line as u32,
             end_line: c.end_line as u32,
-        }).collect()
+        })
+        .collect()
 }
 
 pub fn convert_types(lang_classes: &[languages::ClassInfo], _lang: Language) -> Vec<GraphTypeInfo> {
-    lang_classes.iter()
+    lang_classes
+        .iter()
         .filter(|c| {
             // 只有非 class/struct 的类型进入 types（class/struct 已在 convert_classes 中处理）
             !matches!(c.kind.as_str(), "class" | "struct")
@@ -50,25 +58,32 @@ pub fn convert_types(lang_classes: &[languages::ClassInfo], _lang: Language) -> 
             kind: c.kind.clone(),
             start_line: c.start_line as u32,
             end_line: c.end_line as u32,
-        }).collect()
+        })
+        .collect()
 }
 
 pub fn convert_imports(lang_imports: &[languages::ImportInfo]) -> Vec<GraphImportInfo> {
-    lang_imports.iter().map(|i| GraphImportInfo {
-        source: i.source.clone(),
-        symbols: i.names.clone(),
-        is_external: !i.source.starts_with('.'),
-        import_line: i.line as u32,
-    }).collect()
+    lang_imports
+        .iter()
+        .map(|i| GraphImportInfo {
+            source: i.source.clone(),
+            symbols: i.names.clone(),
+            is_external: !i.source.starts_with('.'),
+            import_line: i.line as u32,
+        })
+        .collect()
 }
 
 pub fn convert_variables(lang_vars: &[languages::VariableInfo]) -> Vec<crate::graph::VariableInfo> {
-    lang_vars.iter().map(|v| crate::graph::VariableInfo {
-        name: v.name.clone(),
-        kind: v.kind.clone(),
-        start_line: v.start_line as u32,
-        is_exported: v.is_exported,
-    }).collect()
+    lang_vars
+        .iter()
+        .map(|v| crate::graph::VariableInfo {
+            name: v.name.clone(),
+            kind: v.kind.clone(),
+            start_line: v.start_line as u32,
+            is_exported: v.is_exported,
+        })
+        .collect()
 }
 
 pub fn convert_exports(lang_exports: &[languages::ExportInfo]) -> Vec<String> {
@@ -198,7 +213,10 @@ pub fn scan_project(root_dir: &Path, exclude: &[String]) -> anyhow::Result<CodeG
         // 用语言适配器解析
         let mut ts_parser = tree_sitter::Parser::new();
         if ts_parser.set_language(&adapter.language()).is_err() {
-            eprintln!("Warning: failed to set language for {:?}, skipping", abs_path);
+            eprintln!(
+                "Warning: failed to set language for {:?}, skipping",
+                abs_path
+            );
             continue;
         }
         let tree = match ts_parser.parse(&content, None) {
@@ -222,21 +240,86 @@ pub fn scan_project(root_dir: &Path, exclude: &[String]) -> anyhow::Result<CodeG
         let variables = convert_variables(&lang_variables);
 
         // 扫描导入符号的使用位置，构建 symbol_refs
-        let imported_symbols: HashSet<String> = imports.iter()
+        let imported_symbols: HashSet<String> = imports
+            .iter()
             .flat_map(|imp| imp.symbols.iter().cloned())
             .collect();
-        let symbol_uses = scan_symbol_uses(&tree, &content, &imported_symbols);
+
+        // 也追踪同文件内定义的变量/函数/类的使用位置
+        let mut all_tracked_symbols = imported_symbols.clone();
+        for var in &variables {
+            all_tracked_symbols.insert(var.name.clone());
+        }
+        for func in &functions {
+            if exports.contains(&func.name) {
+                all_tracked_symbols.insert(func.name.clone());
+            }
+        }
+        for cls in &classes {
+            if exports.contains(&cls.name) {
+                all_tracked_symbols.insert(cls.name.clone());
+            }
+        }
+
+        let symbol_uses = scan_symbol_uses(&tree, &content, &all_tracked_symbols);
         let mut symbol_refs: BTreeMap<String, crate::graph::SymbolRef> = BTreeMap::new();
+        // 先处理导入符号（保持原有逻辑）
         for imp in &imports {
             for sym in &imp.symbols {
                 let use_lines = symbol_uses.get(sym).cloned().unwrap_or_default();
-                symbol_refs.insert(sym.clone(), crate::graph::SymbolRef {
-                    symbol: sym.clone(),
-                    import_line: imp.import_line,
-                    use_lines,
-                });
+                symbol_refs.insert(
+                    sym.clone(),
+                    crate::graph::SymbolRef {
+                        symbol: sym.clone(),
+                        import_line: imp.import_line,
+                        use_lines,
+                    },
+                );
             }
         }
+        // 再处理本地定义的导出符号（import_line = 0 表示本地定义）
+        for sym_name in &all_tracked_symbols {
+            if !symbol_refs.contains_key(sym_name) {
+                if let Some(use_lines) = symbol_uses.get(sym_name) {
+                    if !use_lines.is_empty() {
+                        symbol_refs.insert(
+                            sym_name.clone(),
+                            crate::graph::SymbolRef {
+                                symbol: sym_name.clone(),
+                                import_line: 0,
+                                use_lines: use_lines.clone(),
+                            },
+                        );
+                    }
+                }
+            }
+        }
+        // 过滤掉定义行本身（避免把变量/函数/类的定义处算作使用）
+        for var in &variables {
+            if let Some(ref_entry) = symbol_refs.get_mut(&var.name) {
+                if ref_entry.import_line == 0 {
+                    ref_entry.use_lines.retain(|&line| line != var.start_line);
+                }
+            }
+        }
+        for func in &functions {
+            if let Some(ref_entry) = symbol_refs.get_mut(&func.name) {
+                if ref_entry.import_line == 0 {
+                    ref_entry
+                        .use_lines
+                        .retain(|&line| line < func.start_line || line > func.end_line);
+                }
+            }
+        }
+        for cls in &classes {
+            if let Some(ref_entry) = symbol_refs.get_mut(&cls.name) {
+                if ref_entry.import_line == 0 {
+                    ref_entry.use_lines.retain(|&line| line != cls.start_line);
+                }
+            }
+        }
+        // 移除过滤后 use_lines 为空的本地符号条目
+        symbol_refs.retain(|_, v| v.import_line != 0 || !v.use_lines.is_empty());
 
         let module_name = detect_module_name(abs_path, root_dir);
         module_set.insert(module_name.clone());

@@ -98,7 +98,9 @@ mod grammar_tests {
     fn test_parse_simple_typescript() {
         let lang = lang_typescript();
         let mut parser = tree_sitter::Parser::new();
-        parser.set_language(&lang).expect("Failed to set TypeScript language");
+        parser
+            .set_language(&lang)
+            .expect("Failed to set TypeScript language");
         let tree = parser.parse("const x: number = 42;", None);
         assert!(tree.is_some());
     }
@@ -107,7 +109,9 @@ mod grammar_tests {
     fn test_parse_simple_python() {
         let lang = lang_python();
         let mut parser = tree_sitter::Parser::new();
-        parser.set_language(&lang).expect("Failed to set Python language");
+        parser
+            .set_language(&lang)
+            .expect("Failed to set Python language");
         let tree = parser.parse("def hello(): pass", None);
         assert!(tree.is_some());
     }

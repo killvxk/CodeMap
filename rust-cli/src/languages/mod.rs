@@ -1,11 +1,11 @@
-pub mod typescript;
-pub mod javascript;
-pub mod python;
-pub mod go_lang;
-pub mod rust_lang;
-pub mod java;
 pub mod c_lang;
 pub mod cpp;
+pub mod go_lang;
+pub mod java;
+pub mod javascript;
+pub mod python;
+pub mod rust_lang;
+pub mod typescript;
 
 // ---------------------------------------------------------------------------
 // 公共数据结构
@@ -107,7 +107,10 @@ where
 
 /// 查找第一个指定类型的直接子节点
 #[allow(clippy::manual_find)]
-pub fn find_child_of_type<'a>(node: tree_sitter::Node<'a>, kind: &str) -> Option<tree_sitter::Node<'a>> {
+pub fn find_child_of_type<'a>(
+    node: tree_sitter::Node<'a>,
+    kind: &str,
+) -> Option<tree_sitter::Node<'a>> {
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
         if child.kind() == kind {
@@ -118,7 +121,10 @@ pub fn find_child_of_type<'a>(node: tree_sitter::Node<'a>, kind: &str) -> Option
 }
 
 /// 查找第一个指定类型的后代节点（BFS）
-pub fn find_descendant_of_type<'a>(node: tree_sitter::Node<'a>, kind: &str) -> Option<tree_sitter::Node<'a>> {
+pub fn find_descendant_of_type<'a>(
+    node: tree_sitter::Node<'a>,
+    kind: &str,
+) -> Option<tree_sitter::Node<'a>> {
     let mut queue = std::collections::VecDeque::new();
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
@@ -138,7 +144,8 @@ pub fn find_descendant_of_type<'a>(node: tree_sitter::Node<'a>, kind: &str) -> O
 
 /// 去除字符串两端的引号
 pub fn strip_quotes(s: &str) -> String {
-    s.trim_matches(|c| c == '\'' || c == '"' || c == '`').to_string()
+    s.trim_matches(|c| c == '\'' || c == '"' || c == '`')
+        .to_string()
 }
 
 /// 从源码字节中提取节点文本

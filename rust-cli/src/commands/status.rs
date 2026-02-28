@@ -37,7 +37,10 @@ pub fn run(args: StatusArgs) {
 
     println!("Project: {}", graph.project.name);
     println!("Scanned at: {}", graph.scanned_at);
-    println!("Commit: {}", graph.commit_hash.as_deref().unwrap_or("(none)"));
+    println!(
+        "Commit: {}",
+        graph.commit_hash.as_deref().unwrap_or("(none)")
+    );
     println!("Files: {}", graph.summary.total_files);
     println!("Functions: {}", graph.summary.total_functions);
     println!("Classes: {}", graph.summary.total_classes);
@@ -60,9 +63,6 @@ pub fn run(args: StatusArgs) {
     }
 
     // 已追踪文件数
-    let tracked = meta
-        .as_ref()
-        .map(|m| m.file_hashes.len())
-        .unwrap_or(0);
+    let tracked = meta.as_ref().map(|m| m.file_hashes.len()).unwrap_or(0);
     println!("Tracked files: {tracked}");
 }

@@ -1,8 +1,8 @@
-use tree_sitter::{Language, Tree};
 use super::{
-    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter, VariableInfo,
-    node_text, strip_quotes, walk_nodes,
+    node_text, strip_quotes, walk_nodes, ClassInfo, ExportInfo, FunctionInfo, ImportInfo,
+    LanguageAdapter, VariableInfo,
 };
+use tree_sitter::{Language, Tree};
 
 pub struct PythonAdapter;
 
@@ -33,7 +33,8 @@ impl LanguageAdapter for PythonAdapter {
             if let Some(func) = func_node {
                 if let Some(name_node) = func.child_by_field_name("name") {
                     let name = node_text(name_node, source).to_string();
-                    let params = func.child_by_field_name("parameters")
+                    let params = func
+                        .child_by_field_name("parameters")
                         .map(|p| extract_python_params(p, source))
                         .unwrap_or_default();
                     functions.push(FunctionInfo {
@@ -51,14 +52,24 @@ impl LanguageAdapter for PythonAdapter {
 
     fn extract_imports(&self, tree: &Tree, source: &[u8]) -> Vec<ImportInfo> {
         let mut imports = Vec::new();
-        walk_nodes(tree.root_node(), &mut |node| {
-            match node.kind() {
-                "import_statement" => {
-                    let mut cursor = node.walk();
-                    for child in node.children(&mut cursor) {
-                        match child.kind() {
-                            "dotted_name" => {
-                                let name = node_text(child, source).to_string();
+        walk_nodes(tree.root_node(), &mut |node| match node.kind() {
+            "import_statement" => {
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    match child.kind() {
+                        "dotted_name" => {
+                            let name = node_text(child, source).to_string();
+                            imports.push(ImportInfo {
+                                source: name.clone(),
+                                names: vec![name],
+                                is_default: false,
+                                line: node.start_position().row + 1,
+                            });
+                        }
+                        "aliased_import" => {
+                            let name_node = child.named_child(0);
+                            if let Some(n) = name_node {
+                                let name = node_text(n, source).to_string();
                                 imports.push(ImportInfo {
                                     source: name.clone(),
                                     names: vec![name],
@@ -66,61 +77,50 @@ impl LanguageAdapter for PythonAdapter {
                                     line: node.start_position().row + 1,
                                 });
                             }
-                            "aliased_import" => {
-                                let name_node = child.named_child(0);
-                                if let Some(n) = name_node {
-                                    let name = node_text(n, source).to_string();
-                                    imports.push(ImportInfo {
-                                        source: name.clone(),
-                                        names: vec![name],
-                                        is_default: false,
-                                        line: node.start_position().row + 1,
-                                    });
-                                }
-                            }
-                            _ => {}
                         }
+                        _ => {}
                     }
                 }
-                "import_from_statement" => {
-                    let module = node.child_by_field_name("module_name")
-                        .map(|n| node_text(n, source).to_string())
-                        .unwrap_or_default();
-                    let mut names = Vec::new();
-                    let mut past_import = false;
-                    let mut cursor = node.walk();
-                    for child in node.children(&mut cursor) {
-                        if child.kind() == "import" {
-                            past_import = true;
-                            continue;
-                        }
-                        if !past_import {
-                            continue;
-                        }
-                        match child.kind() {
-                            "dotted_name" | "identifier" => {
-                                names.push(node_text(child, source).to_string());
-                            }
-                            "aliased_import" => {
-                                if let Some(n) = child.named_child(0) {
-                                    names.push(node_text(n, source).to_string());
-                                }
-                            }
-                            "wildcard_import" => {
-                                names.push("*".to_string());
-                            }
-                            _ => {}
-                        }
-                    }
-                    imports.push(ImportInfo {
-                        source: module,
-                        names,
-                        is_default: false,
-                        line: node.start_position().row + 1,
-                    });
-                }
-                _ => {}
             }
+            "import_from_statement" => {
+                let module = node
+                    .child_by_field_name("module_name")
+                    .map(|n| node_text(n, source).to_string())
+                    .unwrap_or_default();
+                let mut names = Vec::new();
+                let mut past_import = false;
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    if child.kind() == "import" {
+                        past_import = true;
+                        continue;
+                    }
+                    if !past_import {
+                        continue;
+                    }
+                    match child.kind() {
+                        "dotted_name" | "identifier" => {
+                            names.push(node_text(child, source).to_string());
+                        }
+                        "aliased_import" => {
+                            if let Some(n) = child.named_child(0) {
+                                names.push(node_text(n, source).to_string());
+                            }
+                        }
+                        "wildcard_import" => {
+                            names.push("*".to_string());
+                        }
+                        _ => {}
+                    }
+                }
+                imports.push(ImportInfo {
+                    source: module,
+                    names,
+                    is_default: false,
+                    line: node.start_position().row + 1,
+                });
+            }
+            _ => {}
         });
         imports
     }
@@ -128,8 +128,12 @@ impl LanguageAdapter for PythonAdapter {
     fn extract_exports(&self, tree: &Tree, source: &[u8]) -> Vec<ExportInfo> {
         // 先尝试 __all__
         if let Some(all_exports) = extract_dunder_all(tree, source) {
-            return all_exports.into_iter()
-                .map(|name| ExportInfo { name, kind: "variable".into() })
+            return all_exports
+                .into_iter()
+                .map(|name| ExportInfo {
+                    name,
+                    kind: "variable".into(),
+                })
                 .collect();
         }
         // 回退：所有顶层函数和类
@@ -150,6 +154,28 @@ impl LanguageAdapter for PythonAdapter {
                         name: node_text(n, source).to_string(),
                         kind: "class".into(),
                     });
+                }
+            } else {
+                // 顶层变量赋值（非下划线开头视为导出，去重）
+                let assignment = if child.kind() == "expression_statement" {
+                    child.named_child(0).filter(|n| n.kind() == "assignment")
+                } else if child.kind() == "assignment" {
+                    Some(child)
+                } else {
+                    None
+                };
+                if let Some(assign) = assignment {
+                    if let Some(left) = assign.child_by_field_name("left") {
+                        if left.kind() == "identifier" {
+                            let name = node_text(left, source).to_string();
+                            if !name.starts_with('_') && !exports.iter().any(|e| e.name == name) {
+                                exports.push(ExportInfo {
+                                    name,
+                                    kind: "variable".into(),
+                                });
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -210,7 +236,10 @@ impl LanguageAdapter for PythonAdapter {
     }
 }
 
-fn unwrap_decorated<'a>(node: tree_sitter::Node<'a>, expected: &str) -> Option<tree_sitter::Node<'a>> {
+fn unwrap_decorated<'a>(
+    node: tree_sitter::Node<'a>,
+    expected: &str,
+) -> Option<tree_sitter::Node<'a>> {
     if node.kind() == expected {
         return Some(node);
     }
@@ -338,7 +367,9 @@ def helper():
         let adapter = PythonAdapter::new();
         let imports = adapter.extract_imports(&tree, src.as_bytes());
         assert!(imports.iter().any(|i| i.source == "os"));
-        assert!(imports.iter().any(|i| i.source == "pathlib" && i.names.contains(&"Path".to_string())));
+        assert!(imports
+            .iter()
+            .any(|i| i.source == "pathlib" && i.names.contains(&"Path".to_string())));
     }
 
     #[test]

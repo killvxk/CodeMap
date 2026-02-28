@@ -1,9 +1,12 @@
-use tree_sitter::{Language, Tree};
-use super::{
-    ClassInfo, ExportInfo, FunctionInfo, ImportInfo, LanguageAdapter, VariableInfo,
-    find_descendant_of_type, node_text, walk_nodes,
+use super::c_lang::{
+    extract_c_classes, extract_c_exports, extract_c_functions, extract_c_includes,
+    extract_c_variables,
 };
-use super::c_lang::{extract_c_includes, extract_c_functions, extract_c_exports, extract_c_classes, extract_c_variables};
+use super::{
+    find_descendant_of_type, node_text, walk_nodes, ClassInfo, ExportInfo, FunctionInfo,
+    ImportInfo, LanguageAdapter, VariableInfo,
+};
+use tree_sitter::{Language, Tree};
 
 pub struct CppAdapter;
 
@@ -49,7 +52,10 @@ impl LanguageAdapter for CppAdapter {
             }
             if let Some(name_node) = node.child_by_field_name("name") {
                 let class_name = node_text(name_node, source).to_string();
-                if let Some(ci) = classes.iter_mut().find(|c| c.name == class_name && c.kind == "class") {
+                if let Some(ci) = classes
+                    .iter_mut()
+                    .find(|c| c.name == class_name && c.kind == "class")
+                {
                     ci.methods = extract_cpp_methods(node, source);
                 }
             }
@@ -148,7 +154,9 @@ int main() {
         let adapter = CppAdapter::new();
         let imports = adapter.extract_imports(&tree, src.as_bytes());
         assert!(imports.iter().any(|i| i.source == "vector" && i.is_default));
-        assert!(imports.iter().any(|i| i.source == "engine.h" && !i.is_default));
+        assert!(imports
+            .iter()
+            .any(|i| i.source == "engine.h" && !i.is_default));
     }
 
     #[test]
@@ -166,8 +174,12 @@ struct Point {
         let tree = parse(src);
         let adapter = CppAdapter::new();
         let classes = adapter.extract_classes(&tree, src.as_bytes());
-        assert!(classes.iter().any(|c| c.name == "Animal" && c.kind == "class"));
-        assert!(classes.iter().any(|c| c.name == "Point" && c.kind == "struct"));
+        assert!(classes
+            .iter()
+            .any(|c| c.name == "Animal" && c.kind == "class"));
+        assert!(classes
+            .iter()
+            .any(|c| c.name == "Point" && c.kind == "struct"));
     }
 
     #[test]
@@ -181,8 +193,12 @@ namespace MyLib {
         let adapter = CppAdapter::new();
         let exports = adapter.extract_exports(&tree, src.as_bytes());
         // Node.js 行为：namespace 本身不出现在 exports 中
-        assert!(!exports.iter().any(|e| e.name == "MyLib" && e.kind == "namespace"),
-            "namespace should not appear in exports");
+        assert!(
+            !exports
+                .iter()
+                .any(|e| e.name == "MyLib" && e.kind == "namespace"),
+            "namespace should not appear in exports"
+        );
     }
 
     #[test]
@@ -196,9 +212,15 @@ constexpr double PI = 3.14;
         let tree = parse(src);
         let adapter = CppAdapter::new();
         let vars = adapter.extract_variables(&tree, src.as_bytes());
-        assert!(vars.iter().any(|v| v.name == "globalVal" && v.kind == "var" && v.is_exported));
-        assert!(vars.iter().any(|v| v.name == "MAX_CONN" && v.kind == "const"));
-        assert!(vars.iter().any(|v| v.name == "internalCounter" && !v.is_exported));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "globalVal" && v.kind == "var" && v.is_exported));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "MAX_CONN" && v.kind == "const"));
+        assert!(vars
+            .iter()
+            .any(|v| v.name == "internalCounter" && !v.is_exported));
         assert!(vars.iter().any(|v| v.name == "PI" && v.kind == "const"));
     }
 }

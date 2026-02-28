@@ -155,9 +155,7 @@ pub struct MetaInfo {
 
 // ── 入口点文件名集合 ──────────────────────────────────────────────────────────
 
-const ENTRY_POINT_NAMES: &[&str] = &[
-    "main", "index", "server", "app", "entry", "bootstrap",
-];
+const ENTRY_POINT_NAMES: &[&str] = &["main", "index", "server", "app", "entry", "bootstrap"];
 
 // ── 公共函数 ──────────────────────────────────────────────────────────────────
 
@@ -261,7 +259,10 @@ pub fn chrono_now() -> String {
         .as_secs();
     // 简单的 UTC 时间格式化
     let (y, mo, d, h, mi, s) = unix_to_datetime(secs);
-    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.000Z", y, mo, d, h, mi, s)
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.000Z",
+        y, mo, d, h, mi, s
+    )
 }
 
 fn unix_to_datetime(secs: u64) -> (u64, u64, u64, u64, u64, u64) {
@@ -284,7 +285,20 @@ fn unix_to_datetime(secs: u64) -> (u64, u64, u64, u64, u64, u64) {
         days -= days_in_year;
         year += 1;
     }
-    let months = [31u64, if is_leap(year) { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let months = [
+        31u64,
+        if is_leap(year) { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
     let mut month = 1u64;
     for &m in &months {
         if days < m {
